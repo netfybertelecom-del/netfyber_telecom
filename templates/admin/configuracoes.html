@@ -1,0 +1,128 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Configurações - NetFyber Admin{% endblock %}
+
+{% block page_icon %}<i class="bi bi-gear me-2"></i>{% endblock %}
+{% block page_title %}Configurações do Site{% endblock %}
+{% block page_description %}Gerencie as configurações gerais do site NetFyber{% endblock %}
+
+{% block content %}
+<div class="p-4">
+    <form method="POST">
+        <!-- Informações de Contato -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-telephone"></i> Informações de Contato
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="telefone_contato" class="form-label">Telefone de Contato</label>
+                        <input type="text" class="form-control" id="telefone_contato" name="telefone_contato" 
+                               value="{{ configs.get('telefone_contato', '') }}">
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="email_contato" class="form-label">Email de Contato</label>
+                        <input type="email" class="form-control" id="email_contato" name="email_contato" 
+                               value="{{ configs.get('email_contato', '') }}">
+                    </div>
+                    
+                    <div class="col-12">
+                        <label for="whatsapp_numero" class="form-label">Número do WhatsApp (para os planos)</label>
+                        <input type="text" class="form-control" id="whatsapp_numero" name="whatsapp_numero" 
+                               value="{{ configs.get('whatsapp_numero', '') }}">
+                        <div class="form-text">Formato: 556384941778 (código do país + DDD + número sem espaços)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Horários de Atendimento -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-clock"></i> Horários de Atendimento
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="horario_segunda_sexta" class="form-label">Segunda a Sexta</label>
+                        <input type="text" class="form-control" id="horario_segunda_sexta" name="horario_segunda_sexta" 
+                               value="{{ configs.get('horario_segunda_sexta', '') }}">
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="horario_sabado" class="form-label">Sábado</label>
+                        <input type="text" class="form-control" id="horario_sabado" name="horario_sabado" 
+                               value="{{ configs.get('horario_sabado', '') }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Endereço -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-geo-alt"></i> Endereço
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="endereco" class="form-label">Endereço Completo</label>
+                    <textarea class="form-control" id="endereco" name="endereco" rows="3">{{ configs.get('endereco', '') }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Redes Sociais -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-share"></i> Redes Sociais
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="instagram_url" class="form-label">URL do Instagram</label>
+                        <input type="url" class="form-control" id="instagram_url" name="instagram_url" 
+                               value="{{ configs.get('instagram_url', '') }}">
+                    </div>                    
+                </div>
+            </div>
+        </div>
+
+        <!-- Página Inicial -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-house"></i> Página Inicial
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label for="hero_imagem" class="form-label">Imagem do Hero (caminho da imagem)</label>
+                        <input type="text" class="form-control" id="hero_imagem" name="hero_imagem" 
+                               value="{{ configs.get('hero_imagem', '') }}">
+                        <div class="form-text">Ex: images/familia.png (deve estar na pasta static/images/)</div>
+                    </div>
+                    
+                    <div class="col-12">
+                        <label for="hero_titulo" class="form-label">Título Principal</label>
+                        <input type="text" class="form-control" id="hero_titulo" name="hero_titulo" 
+                               value="{{ configs.get('hero_titulo', '') }}">
+                    </div>
+                    
+                    <div class="col-12">
+                        <label for="hero_subtitulo" class="form-label">Subtítulo</label>
+                        <input type="text" class="form-control" id="hero_subtitulo" name="hero_subtitulo" 
+                               value="{{ configs.get('hero_subtitulo', '') }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-check-circle"></i> Salvar Todas as Configurações
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

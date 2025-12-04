@@ -1,0 +1,155 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Gerenciar Blog - NetFyber Admin{% endblock %}
+
+{% block page_icon %}<i class="bi bi-journal-text me-2"></i>{% endblock %}
+{% block page_title %}Gerenciar Blog{% endblock %}
+{% block page_description %}Gerencie os posts do blog da NetFyber{% endblock %}
+
+{% block extra_buttons %}
+<a href="{{ url_for('adicionar_post') }}" class="btn btn-primary">
+    <i class="bi bi-plus-circle me-1"></i> Adicionar Post
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="p-4">
+    {% if posts %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">ID</th>
+                    <th>Título</th>
+                    <th style="width: 120px;">Categoria</th>
+                    <th style="width: 130px;">Data</th>
+                    <th style="width: 120px;">Status</th>
+                    <th style="width: 180px;" class="text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for post in posts %}
+                <tr class="transition-all">
+                    <td>
+                        <strong class="text-primary">#{{ post.id }}</strong>
+                    </td>
+                    <td>
+                        <div class="fw-semibold text-dark">{{ post.titulo }}</div>
+                        <small class="text-muted">{{ post.resumo[:60] }}...</small>
+                    </td>
+                    <td>
+                        <span class="badge 
+                            {% if post.categoria == 'tecnologia' %}bg-primary
+                            {% elif post.categoria == 'noticias' %}bg-success
+                            {% else %}bg-warning text-dark{% endif %} status-badge">
+                            {{ post.categoria|title }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="text-dark">{{ post.get_data_formatada() }}</span>
+                    </td>
+                    <td>
+                        {% if post.ativo %}
+                        <span class="badge bg-success status-badge">
+                            <i class="bi bi-check-circle me-1"></i> Ativo
+                        </span>
+                        {% else %}
+                        <span class="badge bg-danger status-badge">
+                            <i class="bi bi-x-circle me-1"></i> Inativo
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center action-buttons">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a href="{{ url_for('editar_post', post_id=post.id) }}" 
+                               class="btn btn-outline-primary" 
+                               data-bs-toggle="tooltip" 
+                               title="Editar post">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form method="POST" 
+                                  action="{{ url_for('excluir_post', post_id=post.id) }}" 
+                                  class="d-inline"
+                                  onsubmit="return confirm('Tem certeza que deseja excluir o post \"{{ post.titulo }}\"?')">
+                                <button type="submit" 
+                                        class="btn btn-outline-danger" 
+                                        data-bs-toggle="tooltip" 
+                                        title="Excluir post">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            <a href="{{ post.link_materia }}" 
+                               target="_blank" 
+                               class="btn btn-outline-info" 
+                               data-bs-toggle="tooltip" 
+                               title="Ver matéria original">
+                                <i class="bi bi-link-45deg"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Summary -->
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card bg-primary bg-opacity-10 border-0">
+                <div class="card-body text-center">
+                    <h3 class="text-primary mb-1">{{ posts|length }}</h3>
+                    <p class="text-muted mb-0">Total de Posts</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success bg-opacity-10 border-0">
+                <div class="card-body text-center">
+                    <h3 class="text-success mb-1">{{ posts|selectattr('categoria', 'equalto', 'noticias')|list|length }}</h3>
+                    <p class="text-muted mb-0">Notícias</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-warning bg-opacity-10 border-0">
+                <div class="card-body text-center">
+                    <h3 class="text-warning mb-1">{{ posts|selectattr('categoria', 'equalto', 'tecnologia')|list|length }}</h3>
+                    <p class="text-muted mb-0">Tecnologia</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="empty-state text-center">
+        <i class="bi bi-journal-x display-1 text-muted mb-4"></i>
+        <h3 class="text-muted mb-3">Nenhum post cadastrado</h3>
+        <p class="text-muted mb-4">
+            Comece adicionando seu primeiro post para o blog.
+        </p>
+        <a href="{{ url_for('adicionar_post') }}" class="btn btn-primary btn-lg">
+            <i class="bi bi-plus-circle me-2"></i> Adicionar Primeiro Post
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+{% block extra_scripts %}
+<script>
+// Adicionar animação de hover nas linhas da tabela
+document.querySelectorAll('.transition-all').forEach(row => {
+    row.style.transition = 'all 0.2s ease';
+    row.addEventListener('mouseenter', function() {
+        this.style.transform = 'translateY(-2px)';
+        this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+    });
+    row.addEventListener('mouseleave', function() {
+        this.style.transform = 'translateY(0)';
+        this.style.boxShadow = 'none';
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}

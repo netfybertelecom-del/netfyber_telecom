@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ 'Editar' if post else 'Adicionar' }} Post - NetFyber Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .admin-top-bar {
+            background: linear-gradient(135deg, #011071 0%, #1a237e 100%);
+            color: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .form-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        .format-guide {
+            background: #f8f9fa;
+            border-left: 4px solid #0d6efd;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        
+        .format-example {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        .live-preview {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+            min-height: 200px;
+            background: white;
+        }
+        
+        .required::after {
+            content: " *";
+            color: #dc3545;
+        }
+        
+        .image-preview {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        .current-image {
+            max-width: 200px;
+            border-radius: 8px;
+            margin-top: 0.5rem;
+        }
+        
+        .btn-format {
+            margin: 2px;
+            border: 1px solid #dee2e6;
+            background: white;
+        }
+        
+        .btn-format:hover {
+            background: #e9ecef;
+        }
+    </style>
+</head>
+<body class="bg-light" style="min-height: 100vh;">
+    <!-- Admin Top Bar -->
+    <div class="admin-top-bar">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center py-3">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-shield-lock fs-4 me-3"></i>
+                    <h1 class="h4 mb-0 text-white fw-bold">
+                        Área Administrativa - NetFyber
+                    </h1>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <a href="{{ url_for('admin_logout') }}" class="btn btn-danger btn-sm">
+                        <i class="bi bi-box-arrow-right me-1"></i> Sair
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container my-4">
+        <div class="form-container p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="h3 text-primary">
+                    {{ 'Editar Post: ' + post.titulo if post else 'Adicionar Novo Post' }}
+                </h2>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('admin_blog') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Voltar para Blog
+                    </a>
+                    <a href="{{ url_for('admin_planos') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-wifi"></i> Planos
+                    </a>
+                </div>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show mb-4">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" enctype="multipart/form-data" id="postForm">
+                <div class="row g-3">
+                    <!-- Título -->
+                    <div class="col-12">
+                        <label for="titulo" class="form-label required">Título do Post</label>
+                        <input type="text" class="form-control" id="titulo" name="titulo" 
+                               value="{{ post.titulo if post else '' }}" required
+                               placeholder="Digite o título impactante do post">
+                    </div>
+                    
+                    <!-- Categoria e Data -->
+                    <div class="col-md-6">
+                        <label for="categoria" class="form-label required">Categoria</label>
+                        <select class="form-select" id="categoria" name="categoria" required>
+                            <option value="tecnologia" {{ 'selected' if post and post.categoria == 'tecnologia' else '' }}>
+                                Tecnologia
+                            </option>
+                            <option value="noticias" {{ 'selected' if post and post.categoria == 'noticias' else '' }}>
+                                Notícias
+                            </option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="data_publicacao" class="form-label required">Data de Publicação</label>
+                        <input type="text" class="form-control" id="data_publicacao" name="data_publicacao" 
+                               value="{{ data_hoje }}" required
+                               placeholder="DD/MM/AAAA">
+                        <small class="form-text text-muted">Formato: DD/MM/AAAA</small>
+                    </div>
+
+                    <!-- Conteúdo com Barra de Formatação -->
+                    <div class="col-12">
+                        <label for="conteudo" class="form-label required">Conteúdo Completo</label>
+                        
+                        <!-- Barra de Ferramentas de Formatação -->
+                        <div class="d-flex flex-wrap gap-2 mb-2 p-2 bg-light rounded">
+                            <button type="button" class="btn btn-format btn-sm" onclick="formatText('bold')" title="Negrito">
+                                <i class="bi bi-type-bold"></i> Negrito
+                            </button>
+                            <button type="button" class="btn btn-format btn-sm" onclick="formatText('italic')" title="Itálico">
+                                <i class="bi bi-type-italic"></i> Itálico
+                            </button>
+                            <button type="button" class="btn btn-format btn-sm" onclick="formatText('link')" title="Inserir Link">
+                                <i class="bi bi-link"></i> Link
+                            </button>
+                            <button type="button" class="btn btn-format btn-sm" onclick="formatText('h2')" title="Subtítulo">
+                                <i class="bi bi-type-h2"></i> Título
+                            </button>
+                            <button type="button" class="btn btn-format btn-sm" onclick="formatText('list')" title="Lista">
+                                <i class="bi bi-list-ul"></i> Lista
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="updatePreview()" title="Atualizar Prévia">
+                                <i class="bi bi-eye"></i> Ver Prévia
+                            </button>
+                        </div>
+                        
+                        <textarea class="form-control" id="conteudo" name="conteudo" rows="15" required
+                                  placeholder="Digite o conteúdo completo aqui...">{{ post.conteudo if post else '' }}</textarea>
+                        
+                        <!-- Guia de Formatação -->
+                        <div class="format-guide mt-3">
+                            <h6 class="text-primary mb-3">
+                                <i class="bi bi-info-circle"></i> Formatação Inteligente
+                            </h6>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-2"><strong>1. Negrito (Recomendado)</strong></p>
+                                    <div class="format-example">
+                                        **texto em negrito**<br>
+                                        → <strong>texto em negrito</strong>
+                                    </div>
+                                    
+                                    <p class="mb-2 mt-3"><strong>2. Quebras de linha</strong></p>
+                                    <div class="format-example">
+                                        Quebra de linhas automaticamente. 
+                                         
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <p class="mb-2"><strong>3. Links HTML</strong></p>
+                                    <div class="format-example">
+                                        &lt;a href="URL"&gt;Texto&lt;/a&gt;<br>
+                                        → <a href="#">Texto</a> (com target="_blank" e rel="noopener")
+                                    </div>
+                                    
+                                    <p class="mb-2 mt-3"><strong>4. Exemplo Completo</strong></p>
+                                    <div class="format-example">
+                                        **Título importante**<br>
+                                        Texto normal com &lt;a href="#"&gt;link&lt;/a&gt;.<br>
+                                        Nova linha automaticamente.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-info mt-3 mb-0">
+                                <small>
+                                    <i class="bi bi-lightbulb"></i>
+                                    <strong>Dica:</strong> Use **negrito** para destaques e HTML apenas para links.
+                                    Links externos recebem automaticamente target="_blank" e rel="noopener".
+                                    Quebra de linhas automaticamente.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Imagem -->
+                    <div class="col-md-6">
+                        <label for="imagem" class="form-label">Imagem do Post</label>
+                        <input type="file" class="form-control" id="imagem" name="imagem" 
+                               accept="image/*">
+                        
+                        <!-- Prévia da nova imagem -->
+                        <div id="imagePreview" class="text-center mt-2"></div>
+                        
+                        <!-- Imagem atual -->
+                        {% if post and post.imagem != 'default.jpg' %}
+                        <div class="mt-3">
+                            <p class="mb-1">Imagem atual:</p>
+                            <img src="{{ post.get_imagem_url() }}" alt="Imagem atual" class="current-image">
+                            <div class="form-text">Para manter esta imagem, não selecione nova imagem.</div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Link da Matéria -->
+                    <div class="col-md-6">
+                        <label for="link_materia" class="form-label required">Link da Matéria Original</label>
+                        <input type="url" class="form-control" id="link_materia" name="link_materia" 
+                               value="{{ post.link_materia if post else '' }}" required
+                               placeholder="https://www.exemplo.com/materia-completa">
+                        <small class="form-text text-muted">
+                            Link para a matéria original (será usado no botão "Leia a matéria completa")
+                        </small>
+                    </div>
+
+                    <!-- Prévia ao Vivo -->
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-eye"></i> Prévia do Conteúdo Formatado
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="live-preview" id="previewContent">
+                                    {% if post and post.conteudo_html %}
+                                        {{ post.conteudo_html|safe }}
+                                    {% else %}
+                                        <p class="text-muted">Digite algo acima para ver a prévia...</p>
+                                    {% endif %}
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary btn-sm mt-2" onclick="updatePreview()">
+                                    <i class="bi bi-arrow-clockwise"></i> Atualizar Prévia
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Botões de Ação -->
+                    <div class="col-12">
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('admin_blog') }}" class="btn btn-secondary me-md-2">
+                                <i class="bi bi-x-circle"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> {{ 'Atualizar' if post else 'Adicionar' }} Post
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Funções de formatação - SIMPLIFICADAS
+        function formatText(type) {
+            const textarea = document.getElementById('conteudo');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+            
+            let formattedText = '';
+            
+            switch(type) {
+                case 'bold':
+                    formattedText = `**${selectedText}**`;
+                    break;
+                case 'italic':
+                    formattedText = `*${selectedText}*`;
+                    break;
+                case 'link':
+                    const url = prompt('Digite a URL do link:', 'https://');
+                    if (url) {
+                        const text = prompt('Texto do link:', selectedText || 'Clique aqui');
+                        if (text) {
+                            const extraAttrs = url.startsWith('http') ? 
+                                ' target="_blank" rel="noopener noreferrer"' : '';
+                            formattedText = `<a href="${url}"${extraAttrs}>${text}</a>`;
+                        }
+                    } else {
+                        return;
+                    }
+                    break;
+                case 'h2':
+                    formattedText = `## ${selectedText}`;
+                    break;
+                case 'list':
+                    formattedText = `- ${selectedText}`;
+                    break;
+            }
+            
+            if (formattedText) {
+                textarea.value = textarea.value.substring(0, start) + 
+                               formattedText + 
+                               textarea.value.substring(end);
+                
+                textarea.focus();
+                textarea.selectionStart = textarea.selectionEnd = start + formattedText.length;
+                
+                updatePreview();
+            }
+        }
+        
+        // Atualizar preview - SIMPLIFICADA E ALINHADA COM O BACKEND
+        function updatePreview() {
+    const content = document.getElementById('conteudo').value;
+    const preview = document.getElementById('previewContent');
+    
+    if (!content.trim()) {
+        preview.innerHTML = '<p class="text-muted">Digite algo para ver a prévia...</p>';
+        return;
+    }
+    
+    preview.innerHTML = '<p class="text-muted"><i class="bi bi-hourglass-split"></i> Processando...</p>';
+    
+    // Processamento ALINHADO com o back-end
+    let html = content;
+    const lines = html.split('\n');
+    let processedLines = [];
+    let inList = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].trim();
+        
+        // Item de lista
+        if (line.startsWith('- ') || line.startsWith('* ')) {
+            if (!inList) {
+                processedLines.push('<ul>');
+                inList = true;
+            }
+            let itemContent = line.substring(2).trim();
+            // Processar negrito dentro do item
+            itemContent = itemContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            processedLines.push(`<li>${itemContent}</li>`);
+        } else {
+            // Fechar lista se estava aberta
+            if (inList) {
+                processedLines.push('</ul>');
+                inList = false;
+            }
+            
+            if (line) {
+                // Título
+                if (line.startsWith('## ')) {
+                    let title = line.substring(3).trim();
+                    processedLines.push(`<h4>${title}</h4>`);
+                } else {
+                    // Negrito
+                    line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                    processedLines.push(line + '<br>');
+                }
+            } else {
+                // Linha vazia = quebra de parágrafo
+                processedLines.push('<br>');
+            }
+        }
+    }
+    
+    // Fechar lista se ainda aberta
+    if (inList) {
+        processedLines.push('</ul>');
+    }
+    
+    // Juntar tudo
+    html = processedLines.join('\n');
+    
+    // Processar links HTML
+    html = html.replace(/<a href="(.*?)">(.*?)<\/a>/g, (match, url, text) => {
+        if (url.startsWith('http')) {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+        }
+        return match;
+    });
+    
+    // Exibir resultado
+    preview.innerHTML = html;
+}
+        
+        // Preview de imagem
+        document.getElementById('imagem').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const preview = document.getElementById('imagePreview');
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.innerHTML = `
+                        <div class="alert alert-info p-2">
+                            <small><i class="bi bi-image"></i> Nova imagem selecionada:</small>
+                            <br>
+                            <strong>${file.name}</strong> (${(file.size / 1024).toFixed(1)} KB)
+                        </div>
+                    `;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                preview.innerHTML = '';
+            }
+        });
+        
+        // Validação do formulário
+        document.getElementById('postForm').addEventListener('submit', function(e) {
+            const titulo = document.getElementById('titulo').value.trim();
+            const conteudo = document.getElementById('conteudo').value.trim();
+            const link = document.getElementById('link_materia').value.trim();
+            
+            if (!titulo || !conteudo || !link) {
+                e.preventDefault();
+                alert('Por favor, preencha todos os campos obrigatórios!');
+                return false;
+            }
+            
+            try {
+                new URL(link);
+            } catch {
+                e.preventDefault();
+                alert('Por favor, insira uma URL válida para a matéria!');
+                return false;
+            }
+            
+            const data = document.getElementById('data_publicacao').value.trim();
+            const datePattern = /^\d{2}\/\d{2}\/\d{4}$/;
+            if (!datePattern.test(data)) {
+                e.preventDefault();
+                alert('Formato de data inválido! Use DD/MM/AAAA');
+                return false;
+            }
+            
+            return true;
+        });
+        
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.getElementById('conteudo').value.trim()) {
+                updatePreview();
+            }
+            
+            // Atualizar preview ao digitar
+            let previewTimeout;
+            document.getElementById('conteudo').addEventListener('input', function() {
+                clearTimeout(previewTimeout);
+                previewTimeout = setTimeout(updatePreview, 300);
+            });
+        });
+    </script>
+</body>
+</html>

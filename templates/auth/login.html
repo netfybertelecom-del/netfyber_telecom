@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acesso Administrativo - NetFyber</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { 
+            background: linear-gradient(135deg, #011071 0%, #04a3ff 100%);
+            min-height: 100vh; 
+        }
+    </style>
+</head>
+<body class="d-flex align-items-center">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-4">
+                <div class="card border-0 shadow-lg">
+                    <div class="card-body p-5">
+                        <div class="text-center mb-4">
+                            <i class="bi bi-shield-lock display-4 text-primary"></i>
+                            <h2 class="h3 fw-bold text-primary mt-3">Acesso Administrativo</h2>
+                        </div>
+                        
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show">
+                                        {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Usuário</label>
+                                <input type="text" class="form-control" id="username" name="username" required>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="password" class="form-label">Senha</label>
+                                <input type="password" class="form-control" id="password" name="password" required>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary w-100 py-2">
+                                <i class="bi bi-box-arrow-in-right"></i> Entrar no Sistema
+                            </button>
+                        </form>
+
+                        <div class="alert alert-warning mt-4">
+                            <small>
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>Acesso Restrito:</strong> Área exclusiva para administradores autorizados.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

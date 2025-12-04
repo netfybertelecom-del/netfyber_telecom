@@ -1,0 +1,396 @@
+{% extends "public/base.html" %}
+
+{% block content %}
+<!-- Seção do Velocímetro - Responsividade Corrigida -->
+<section class="teste-velocidade-section py-5">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h1 class="display-4 fw-bold text-primary mb-3">Teste de Velocidade</h1>
+            <p class="lead text-dark">Como testar corretamente a velocidade da sua internet</p>
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <!-- Card de Introdução -->
+                <div class="card border-0 shadow-lg mb-5">
+                    <div class="card-body p-4 p-md-5">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h3 class="text-primary mb-3">Teste Sua Velocidade de Forma Confiável</h3>
+                                <p class="mb-4">
+                                    Para resultados precisos e confiáveis, recomendamos utilizar serviços especializados 
+                                    em teste de velocidade que possuem servidores dedicados e metodologia comprovada.
+                                </p>
+                                <div class="alert alert-info mb-0">
+                                    <i class="bi bi-lightbulb"></i> 
+                                    <strong>Dica:</strong> Sempre teste conectado via cabo de rede para resultados mais precisos
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-center mt-4 mt-md-0">
+                                <i class="bi bi-speedometer2 display-1 text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Serviços Recomendados -->
+                <div class="row mb-5">
+                    <div class="col-md-6 mb-4">
+                        <div class="card border-0 shadow h-100">
+                            <div class="card-body text-center p-4">
+                                <div class="mb-3">
+                                    <i class="bi bi-lightning-charge display-4 text-warning"></i>
+                                </div>
+                                <h4 class="text-primary mb-3">Speedtest by Ookla</h4>
+                                <p class="mb-4">O teste de velocidade mais popular e confiável do mundo</p>
+                                <a href="https://www.speedtest.net" target="_blank" class="btn btn-primary btn-lg w-100">
+                                    <i class="bi bi-box-arrow-up-right me-2"></i> Fazer Teste
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card border-0 shadow h-100">
+                            <div class="card-body text-center p-4">
+                                <div class="mb-3">
+                                    <i class="bi bi-play-btn display-4 text-danger"></i>
+                                </div>
+                                <h4 class="text-primary mb-3">Fast.com</h4>
+                                <p class="mb-4">Serviço da Netflix, focado em velocidade de download</p>
+                                <a href="https://fast.com" target="_blank" class="btn btn-primary btn-lg w-100">
+                                    <i class="bi bi-box-arrow-up-right me-2"></i> Fazer Teste
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Guia Passo a Passo -->
+                <div class="card border-0 shadow-lg">
+                    <div class="card-body p-4 p-md-5">
+                        <h3 class="text-primary text-center mb-4">Como Testar Corretamente</h3>
+                        
+                        <div class="row">
+                            <!-- Passo 1 -->
+                            <div class="col-md-6 mb-4">
+                                <div class="d-flex align-items-start">
+                                    <div class="flex-shrink-0">
+                                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
+                                            <strong>1</strong>
+                                        </div>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h5 class="text-primary mb-2">Conecte via Cabo</h5>
+                                        <p class="text-muted mb-0">Use cabo de rede diretamente no modem para evitar interferência do Wi-Fi</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Passo 2 -->
+                            <div class="col-md-6 mb-4">
+                                <div class="d-flex align-items-start">
+                                    <div class="flex-shrink-0">
+                                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
+                                            <strong>2</strong>
+                                        </div>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h5 class="text-primary mb-2">Feche Aplicações</h5>
+                                        <p class="text-muted mb-0">Encerre downloads, streaming e outras aplicações que usem internet</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Passo 3 -->
+                            <div class="col-md-6 mb-4">
+                                <div class="d-flex align-items-start">
+                                    <div class="flex-shrink-0">
+                                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
+                                            <strong>3</strong>
+                                        </div>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h5 class="text-primary mb-2">Teste em Horários Diferentes</h5>
+                                        <p class="text-muted mb-0">Faça testes em diferentes períodos do dia para ter uma média real</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Passo 4 -->
+                            <div class="col-md-6 mb-4">
+                                <div class="d-flex align-items-start">
+                                    <div class="flex-shrink-0">
+                                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
+                                            <strong>4</strong>
+                                        </div>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h5 class="text-primary mb-2">Use Múltiplos Serviços</h5>
+                                        <p class="text-muted mb-0">Compare resultados entre diferentes plataformas de teste</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações de Suporte -->
+                <div class="card border-0 shadow-lg mt-5">
+                    <div class="card-body p-4 p-md-5">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h4 class="text-primary mb-3">Precisa de Ajuda?</h4>
+                                <p class="text-muted mb-4">
+                                    Se você está enfrentando problemas de velocidade, nossa equipe está pronta para ajudar.
+                                    Entre em contato conosco para suporte técnico especializado.
+                                </p>
+                                <a href="https://wa.me/{{ configs.get('whatsapp_numero', '556384941778') }}" 
+                                   class="btn btn-success btn-lg" target="_blank">
+                                    <i class="bi bi-whatsapp me-2"></i> Falar com Suporte
+                                </a>
+                            </div>
+                            <div class="col-md-4 text-center mt-4 mt-md-0">
+                                <i class="bi bi-headset display-1 text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===== ESTILOS ESPECÍFICOS DO VELOCÍMETRO - RESPONSIVIDADE RESTAURADA ===== */
+
+.teste-velocidade-section {
+    background: linear-gradient(rgba(153, 195, 250, 0.2), rgba(34, 21, 21, 0.2)), 
+                url("{{ url_for('static', filename='images/terra.png') }}") no-repeat center center;
+    background-size: cover;
+    min-height: calc(100vh - 200px);
+}
+
+/* Cards principais */
+.teste-velocidade-section .card {
+    border-radius: 15px;
+    transition: all 0.3s ease;
+}
+
+.teste-velocidade-section .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+}
+
+/* Números dos passos */
+.teste-velocidade-section .bg-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
+}
+
+/* Botões */
+.teste-velocidade-section .btn {
+    border-radius: 10px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.teste-velocidade-section .btn:hover {
+    transform: translateY(-2px);
+}
+
+/* ===== RESPONSIVIDADE ESPECÍFICA ===== */
+
+/* Tablets */
+@media (max-width: 991.98px) {
+    .teste-velocidade-section {
+        padding: 3rem 0 !important;
+    }
+    
+    .teste-velocidade-section .display-4 {
+        font-size: 2.5rem !important;
+    }
+    
+    .teste-velocidade-section .card-body {
+        padding: 2rem !important;
+    }
+}
+
+/* Mobile Large */
+@media (max-width: 767.98px) {
+    .teste-velocidade-section {
+        padding: 2rem 0 !important;
+        min-height: auto;
+    }
+    
+    .teste-velocidade-section .display-4 {
+        font-size: 2rem !important;
+    }
+    
+    .teste-velocidade-section .lead {
+        font-size: 1.1rem !important;
+    }
+    
+    .teste-velocidade-section .card-body {
+        padding: 1.5rem !important;
+    }
+    
+    /* Ajuste dos passos em mobile */
+    .teste-velocidade-section .d-flex.align-items-start {
+        margin-bottom: 1.5rem;
+    }
+    
+    .teste-velocidade-section .bg-primary {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 0.9rem;
+    }
+    
+    /* Botões em mobile */
+    .teste-velocidade-section .btn-lg {
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+    }
+}
+
+/* Mobile Small */
+@media (max-width: 575.98px) {
+    .teste-velocidade-section {
+        padding: 1.5rem 0 !important;
+    }
+    
+    .teste-velocidade-section .display-4 {
+        font-size: 1.8rem !important;
+    }
+    
+    .teste-velocidade-section .lead {
+        font-size: 1rem !important;
+    }
+    
+    .teste-velocidade-section .card-body {
+        padding: 1.25rem !important;
+    }
+    
+    .teste-velocidade-section .bg-primary {
+        width: 35px !important;
+        height: 35px !important;
+        font-size: 0.8rem;
+        margin-right: 0.75rem !important;
+    }
+    
+    .teste-velocidade-section h5 {
+        font-size: 1.1rem;
+    }
+    
+    /* Stack columns em mobile muito pequeno */
+    .teste-velocidade-section .col-md-6 {
+        margin-bottom: 1rem;
+    }
+    
+    /* Ajuste de ícones */
+    .teste-velocidade-section .display-1 {
+        font-size: 3rem !important;
+    }
+    
+    .teste-velocidade-section .display-4 {
+        font-size: 2.5rem !important;
+    }
+}
+
+/* Mobile Extra Small */
+@media (max-width: 375px) {
+    .teste-velocidade-section {
+        padding: 1rem 0 !important;
+    }
+    
+    .teste-velocidade-section .display-4 {
+        font-size: 1.6rem !important;
+    }
+    
+    .teste-velocidade-section .card-body {
+        padding: 1rem !important;
+    }
+    
+    .teste-velocidade-section .btn-lg {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
+    }
+    
+    .teste-velocidade-section .bg-primary {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 0.75rem;
+        margin-right: 0.5rem !important;
+    }
+}
+
+/* Ajustes para orientação landscape em mobile */
+@media (max-height: 600px) and (orientation: landscape) {
+    .teste-velocidade-section {
+        min-height: auto;
+        padding: 1rem 0 !important;
+    }
+    
+    .teste-velocidade-section .card {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Melhorias de acessibilidade */
+@media (prefers-reduced-motion: reduce) {
+    .teste-velocidade-section .card,
+    .teste-velocidade-section .btn {
+        transition: none;
+    }
+}
+
+/* Suporte para dark mode */
+@media (prefers-color-scheme: dark) {
+    .teste-velocidade-section .card {
+        background-color: #2d3748;
+        border-color: #4a5568;
+    }
+    
+    .teste-velocidade-section .text-dark {
+        color: #e2e8f0 !important;
+    }
+    
+    .teste-velocidade-section .text-muted {
+        color: #a0aec0 !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Inicialização específica da página do velocímetro
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Página do velocímetro inicializada');
+    
+    // Adicionar animações de entrada
+    const cards = document.querySelectorAll('.teste-velocidade-section .card');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(30px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'all 0.6s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, 100 * index);
+    });
+    
+    // Tracking de cliques nos links de teste
+    document.querySelectorAll('a[href*="speedtest"], a[href*="fast.com"]').forEach(link => {
+        link.addEventListener('click', function(e) {
+            const service = this.href.includes('speedtest') ? 'Speedtest' : 'Fast.com';
+            console.log(`📊 Usuário clicou em: ${service}`);
+            
+            // Aqui você pode adicionar analytics
+            // gtag('event', 'click', { 'event_category': 'Teste Velocidade', 'event_label': service });
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,168 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Gerenciar Planos - NetFyber Admin{% endblock %}
+
+{% block page_icon %}<i class="bi bi-wifi me-2"></i>{% endblock %}
+{% block page_title %}Gerenciar Planos{% endblock %}
+{% block page_description %}Gerencie os planos de internet disponíveis para seus clientes{% endblock %}
+
+{% block extra_buttons %}
+<a href="{{ url_for('adicionar_plano') }}" class="btn btn-primary">
+    <i class="bi bi-plus-circle me-1"></i> Adicionar Plano
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="p-4">
+    {% if planos %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">ID</th>
+                    <th>Nome do Plano</th>
+                    <th style="width: 120px;">Preço</th>
+                    <th style="width: 140px;">Velocidade</th>
+                    <th style="width: 130px;">Recomendado</th>
+                    <th style="width: 120px;">Status</th>
+                    <th style="width: 180px;" class="text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for plano in planos %}
+                <tr class="transition-all">
+                    <td>
+                        <strong class="text-primary">#{{ plano.id }}</strong>
+                    </td>
+                    <td>
+                        <div class="fw-semibold text-dark">{{ plano.nome }}</div>
+                        <small class="text-muted">{{ plano.get_features_list()|length }} características</small>
+                    </td>
+                    <td>
+                        <span class="fw-bold text-success">R$ {{ plano.preco }}</span>
+                    </td>
+                    <td>
+                        <span class="text-dark">{{ plano.velocidade or 'Não especificada' }}</span>
+                    </td>
+                    <td>
+                        {% if plano.recomendado %}
+                        <span class="badge bg-warning status-badge">
+                            <i class="bi bi-star-fill me-1"></i> Sim
+                        </span>
+                        {% else %}
+                        <span class="badge bg-secondary status-badge">
+                            <i class="bi bi-star me-1"></i> Não
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if plano.ativo %}
+                        <span class="badge bg-success status-badge">
+                            <i class="bi bi-check-circle me-1"></i> Ativo
+                        </span>
+                        {% else %}
+                        <span class="badge bg-danger status-badge">
+                            <i class="bi bi-x-circle me-1"></i> Inativo
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center action-buttons">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a href="{{ url_for('editar_plano', plano_id=plano.id) }}" 
+                               class="btn btn-outline-primary" 
+                               data-bs-toggle="tooltip" 
+                               title="Editar plano">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form method="POST" 
+                                  action="{{ url_for('excluir_plano', plano_id=plano.id) }}" 
+                                  class="d-inline"
+                                  onsubmit="return confirmDelete('{{ plano.nome }}', 'o plano')">
+                                <button type="submit" 
+                                        class="btn btn-outline-danger" 
+                                        data-bs-toggle="tooltip" 
+                                        title="Excluir plano">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            <a href="{{ url_for('planos') }}" 
+                               target="_blank" 
+                               class="btn btn-outline-info" 
+                               data-bs-toggle="tooltip" 
+                               title="Visualizar no site">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Summary -->
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card bg-primary bg-opacity-10 border-0">
+                <div class="card-body text-center">
+                    <h3 class="text-primary mb-1">{{ planos|length }}</h3>
+                    <p class="text-muted mb-0">Total de Planos</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-warning bg-opacity-10 border-0">
+                <div class="card-body text-center">
+                    <h3 class="text-warning mb-1">{{ planos|selectattr('recomendado')|list|length }}</h3>
+                    <p class="text-muted mb-0">Planos Recomendados</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success bg-opacity-10 border-0">
+                <div class="card-body text-center">
+                    <h3 class="text-success mb-1">{{ planos|selectattr('ativo')|list|length }}</h3>
+                    <p class="text-muted mb-0">Planos Ativos</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="empty-state text-center">
+        <i class="bi bi-inbox display-1 text-muted mb-4"></i>
+        <h3 class="text-muted mb-3">Nenhum plano cadastrado</h3>
+        <p class="text-muted mb-4">
+            Comece adicionando seu primeiro plano de internet para disponibilizar aos clientes.
+        </p>
+        <a href="{{ url_for('adicionar_plano') }}" class="btn btn-primary btn-lg">
+            <i class="bi bi-plus-circle me-2"></i> Adicionar Primeiro Plano
+        </a>
+        <div class="mt-4">
+            <small class="text-muted">
+                <i class="bi bi-lightbulb me-1"></i>
+                Dica: Adicione pelo menos 3 planos com diferentes velocidades e preços
+            </small>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% block extra_scripts %}
+<script>
+    // Adicionar animação de hover nas linhas da tabela
+    document.querySelectorAll('.transition-all').forEach(row => {
+        row.style.transition = 'all 0.2s ease';
+        row.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-2px)';
+            this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+        });
+        row.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = 'none';
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "public/base.html" %}
+
+{% block content %}
+<style>
+.planos-background {
+    background: linear-gradient(rgba(153, 195, 250, 0.2), rgba(34, 21, 21, 0.2)), 
+                url("{{ url_for('static', filename='images/terra.png') }}") no-repeat center center;
+    background-size: cover;
+    min-height: calc(100vh - 200px);
+    padding: 2rem 0;
+}
+</style>
+
+<!-- Plans Section -->
+<section class="planos-background">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h1 class="display-4 fw-bold text-primary mb-3">Nossos Planos</h1>
+            <p class="lead text-dark">Escolha o plano perfeito para sua necessidade</p>
+        </div>
+
+        <!-- Carrossel de Planos -->
+        <div class="carrossel-planos-container position-relative">
+            <div class="carrossel-planos" id="carrosselPlanos">
+                {% for plano in planos %}
+                <div class="carrossel-item">
+                    <div class="card plan-card h-100 border-0 shadow-lg position-relative 
+                        {% if plano.recomendado %}recommended{% endif %}">
+                        
+                        {% if plano.recomendado %}
+                        <div class="position-absolute top-0 start-50 translate-middle px-4 py-1 bg-warning text-dark rounded-pill small fw-bold">
+                            <i class="bi bi-star-fill"></i> RECOMENDADO
+                        </div>
+                        {% endif %}
+                        
+                        <div class="card-body p-4 d-flex flex-column">
+                            <div class="text-center mb-4">
+                                <h3 class="card-title fw-bold text-primary">{{ plano.nome }}</h3>
+                                <div class="price-tag bg-warning bg-opacity-25 text-dark rounded-pill px-3 py-2 d-inline-block my-3 shadow-sm">
+                                    <span class="h4 fw-bold mb-0">R$ {{ plano.preco }}</span>
+                                    <small class="text-dark opacity-75">/mês</small>
+                                </div>
+                            </div>
+                            
+                            <ul class="list-unstyled mb-4 flex-grow-1">
+                                {% for feature in plano.features %}
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-success me-2"></i>
+                                    {{ feature }}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            
+                            {% set whatsapp_msg = "Olá, quero adquirir o plano de " + plano.nome %}
+                            <a href="https://wa.me/{{ configs.get('whatsapp_numero', '556384941778') }}?text={{ whatsapp_msg|urlencode }}" 
+                               class="btn btn-primary btn-lg w-100 mt-auto" 
+                               target="_blank">
+                                <i class="bi bi-whatsapp"></i> ASSINAR AGORA
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Controles de Navegação -->
+            <button class="carrossel-controle carrossel-anterior position-absolute top-50 start-0 translate-middle-y" 
+                    aria-label="Plano anterior">
+                <i class="bi bi-chevron-left fs-4"></i>
+            </button>
+            
+            <button class="carrossel-controle carrossel-proximo position-absolute top-50 end-0 translate-middle-y" 
+                    aria-label="Próximo plano">
+                <i class="bi bi-chevron-right fs-4"></i>
+            </button>
+
+            <!-- Indicadores -->
+            <div class="carrossel-indicadores position-absolute start-50 translate-middle-x">
+                <!-- Gerados via JavaScript -->
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
