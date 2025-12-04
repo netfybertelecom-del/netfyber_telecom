@@ -14,19 +14,17 @@ import bleach
 from bleach.linkifier import Linker
 from urllib.parse import urlparse
 import html
-import psycopg2
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-
-app = Flask(__name__)
 
 # ========================================
 # CONFIGURAÇÕES BÁSICAS
 # ========================================
 
+app = Flask(__name__)
+
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres:102030@localhost/testenet1')
 ADMIN_URL_PREFIX = os.environ.get('ADMIN_URL_PREFIX', '/gestao-exclusiva-netfyber')
-ADMIN_IPS = os.environ.get('ADMIN_IPS', '127.0.0.1').split(',')
+ADMIN_IPS = os.environ.get('ADMIN_IPS', '127.0.0.1,::1').split(',')
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'netfyber_admin')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@netfyber.com')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Admin@Netfyber2025!')
@@ -846,16 +844,35 @@ def create_database():
             # Extrair informações da URL
             parsed_url = urlparse(database_url)
             
-            # Conectar ao PostgreSQL server
-            conn = psycopg2.connect(
-                database='postgres',
-                user=parsed_url.username,
-                password=parsed_url.password,
-                host=parsed_url.hostname,
-                port=parsed_url.port
-            )
-            conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-            cur = conn.cursor()
+            # Tentar usar psycopg3 primeiro
+            try:
+                import psycopg
+                # Conectar ao PostgreSQL server usando psycopg3
+                conn = psycopg.connect(
+                    dbname='postgres',
+                    user=parsed_url.username,
+                    password=parsed_url.password,
+                    host=parsed_url.hostname,
+                    port=parsed_url.port
+                )
+                conn.autocommit = True
+                cur = conn.cursor()
+                print("✅ Usando psycopg3 (psycopg) para criar banco")
+            except ImportError:
+                # Fallback para psycopg2
+                import psycopg2
+                from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+                
+                conn = psycopg2.connect(
+                    database='postgres',
+                    user=parsed_url.username,
+                    password=parsed_url.password,
+                    host=parsed_url.hostname,
+                    port=parsed_url.port
+                )
+                conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+                cur = conn.cursor()
+                print("✅ Usando psycopg2 (fallback) para criar banco")
             
             # Criar banco de dados se não existir
             db_name = parsed_url.path[1:]  # Remove a barra inicial

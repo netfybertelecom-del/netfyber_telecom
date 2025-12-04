@@ -1,6 +1,4 @@
 #!/bin/bash
-# render-build.sh
-
 echo "🚀 Iniciando build no Render..."
 echo "📦 Python version: $(python --version)"
 echo "📦 Pip version: $(pip --version)"
