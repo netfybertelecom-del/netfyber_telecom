@@ -14,18 +14,9 @@ import bleach
 from bleach.linkifier import Linker
 from urllib.parse import urlparse
 import html
-import os
-from urllib.parse import urlparse
+import psycopg2
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
-# Configurações específicas para Render
-if 'RENDER' in os.environ:
-    print("🚀 Ambiente Render detectado")
-    
-    # Forçar algumas configurações no Render
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_recycle': 300,
-        'pool_pre_ping': True,
-    }
 app = Flask(__name__)
 
 # ========================================
@@ -48,6 +39,25 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads/blog'
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+# ========================================
+# CONFIGURAÇÃO ESPECIAL PARA RENDER.COM
+# ========================================
+
+if 'RENDER' in os.environ:
+    print("🚀 Ambiente Render detectado")
+    
+    # Forçar algumas configurações no Render
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_recycle': 300,
+        'pool_pre_ping': True,
+    }
+    
+    # Ajustar ADMIN_IPS para incluir IPs do Render
+    if ADMIN_IPS and isinstance(ADMIN_IPS, str):
+        ADMIN_IPS = f"{ADMIN_IPS},0.0.0.0,127.0.0.1,::1"
+    else:
+        ADMIN_IPS = "0.0.0.0,127.0.0.1,::1"
 
 db = SQLAlchemy(app)
 
@@ -190,30 +200,6 @@ def formatar_conteudo_inteligente(conteudo):
     conteudo_sanitizado = re.sub(r'<ul>.*?</ul>', clean_br_in_lists, conteudo_sanitizado, flags=re.DOTALL)
     
     return conteudo_sanitizado
-    
-    # 7. Sanitizar HTML permitindo apenas tags seguras
-    allowed_tags = ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li', 
-                   'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div']
-    
-    allowed_attributes = {
-        'a': ['href', 'title', 'target', 'rel', 'class'],
-        '*': ['class']
-    }
-    
-    # Sanitizar o HTML
-    conteudo_sanitizado = bleach.clean(
-        conteudo_formatado,
-        tags=allowed_tags,
-        attributes=allowed_attributes,
-        strip=True,
-        strip_comments=True
-    )
-    
-    # 8. Processar links com atributos de segurança
-    linker = Linker(callbacks=[add_link_attributes])
-    conteudo_final = linker.linkify(conteudo_sanitizado)
-    
-    return conteudo_final
 
 # ========================================
 # SEGURANÇA
@@ -848,86 +834,11 @@ def erro_servidor(error):
     return render_template('public/500.html'), 500
 
 # ========================================
-# INICIALIZAÇÃO
-# ========================================
-
-def create_tables():
-    with app.app_context():
-        try:
-            db.create_all()
-            
-            upload_path = app.config['UPLOAD_FOLDER']
-            os.makedirs(upload_path, exist_ok=True)
-            
-            if AdminUser.query.filter_by(username=ADMIN_USERNAME).first() is None:
-                admin_user = AdminUser(
-                    username=ADMIN_USERNAME, 
-                    email=ADMIN_EMAIL
-                )
-                admin_user.set_password(ADMIN_PASSWORD)
-                db.session.add(admin_user)
-                db.session.commit()
-                print("Usuário administrativo criado com sucesso")
-            
-            configs_padrao = {
-                'telefone_contato': '(63) 8494-1778',
-                'email_contato': 'contato@netfyber.com',
-                'endereco': 'AV. Tocantins – 934, Centro – Sítio Novo – TO<br>Axixá TO / Juverlândia / São Pedro / Folha Seca / Morada Nova / Santa Luzia / Boa Esperança',
-                'horario_segunda_sexta': '08h às 18h',
-                'horario_sabado': '08h às 13h',
-                'whatsapp_numero': '556384941778',
-                'instagram_url': 'https://www.instagram.com/netfybertelecom',
-                'facebook_url': '#',
-                'hero_imagem': 'images/familia.png',
-                'hero_titulo': 'Internet de Alta Velocidade',
-                'hero_subtitulo': 'Conecte sua família ao futuro com a NetFyber Telecom'
-            }
-            
-            for chave, valor in configs_padrao.items():
-                if Configuracao.query.filter_by(chave=chave).first() is None:
-                    config = Configuracao(chave=chave, valor=valor)
-                    db.session.add(config)
-            
-            if Post.query.count() == 0:
-                posts_exemplo = [
-                    Post(
-                        titulo='IA generativa cresce fortemente, mas requer estratégia bem pensada',
-                        conteudo='De acordo com executivos do Itaú e do Banco do Brasil, a inteligência artificial generativa tem grande potencial disruptivo, mas exige investimento significativo e planejamento estratégico — "não basta usar por usar", segundo Marisa Reghini, do BB.\n\n**Muitos bancos preparam uso de "agentes de IA" para automatizar tarefas complexas.**\n<a href="https://www.ibm.com/br-pt/news" target="_blank">IBM Brasil Newsroom</a>\n\n**Apesar do entusiasmo, existe cautela sobre os custos e riscos da adoção.**\n<a href="https://veja.abril.com.br" target="_blank">VEJA</a>',
-                        resumo='IA generativa cresce fortemente, mas requer estratégia bem pensada. De acordo com executivos do Itaú e do Banco do Brasil...',
-                        categoria='tecnologia',
-                        imagem='default.jpg',
-                        link_materia='https://www.valor.com.br/tecnologia/noticia/ia-generativa-cresce-fortemente-mas-requer-estrategia',
-                        data_publicacao=datetime(2025, 11, 1)
-                    )
-                ]
-                
-                for post in posts_exemplo:
-                    post.conteudo_html = formatar_conteudo_inteligente(post.conteudo)
-                    db.session.add(post)
-                
-                print("Posts de exemplo adicionados com sucesso!")
-            
-            db.session.commit()
-            print("Banco de dados inicializado com sucesso!")
-            
-        except Exception as e:
-            print(f"Erro ao inicializar banco de dados: {e}")
-            db.session.rollback()
-
-if __name__ == '__main__':
-    create_tables()
-    debug_mode = os.environ.get('FLASK_ENV') != 'production'
-    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
-# ========================================
-# INICIALIZAÇÃO PARA RENDER.COM
+# INICIALIZAÇÃO DO BANCO DE DADOS
 # ========================================
 
 def create_database():
-    """Função para criar banco de dados se não existir"""
-    import psycopg2
-    from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-    
-    # Pegar URL do banco de dados
+    """Função para criar banco de dados se não existir (para Render)"""
     database_url = os.environ.get('DATABASE_URL')
     
     if database_url:
@@ -961,19 +872,95 @@ def create_database():
             print(f"⚠️ Não foi possível criar banco de dados: {e}")
             print("🔧 Usando banco existente ou configurado...")
 
+def create_tables():
+    """Cria as tabelas e dados iniciais"""
+    with app.app_context():
+        try:
+            # Criar tabelas
+            db.create_all()
+            
+            # Criar pasta de uploads
+            upload_path = app.config['UPLOAD_FOLDER']
+            os.makedirs(upload_path, exist_ok=True)
+            
+            # Criar usuário admin se não existir
+            if AdminUser.query.filter_by(username=ADMIN_USERNAME).first() is None:
+                admin_user = AdminUser(
+                    username=ADMIN_USERNAME, 
+                    email=ADMIN_EMAIL
+                )
+                admin_user.set_password(ADMIN_PASSWORD)
+                db.session.add(admin_user)
+                print("👤 Usuário administrativo criado com sucesso")
+            
+            # Configurações padrão
+            configs_padrao = {
+                'telefone_contato': '(63) 8494-1778',
+                'email_contato': 'contato@netfyber.com',
+                'endereco': 'AV. Tocantins – 934, Centro – Sítio Novo – TO<br>Axixá TO / Juverlândia / São Pedro / Folha Seca / Morada Nova / Santa Luzia / Boa Esperança',
+                'horario_segunda_sexta': '08h às 18h',
+                'horario_sabado': '08h às 13h',
+                'whatsapp_numero': '556384941778',
+                'instagram_url': 'https://www.instagram.com/netfybertelecom',
+                'facebook_url': '#',
+                'hero_imagem': 'images/familia.png',
+                'hero_titulo': 'Internet de Alta Velocidade',
+                'hero_subtitulo': 'Conecte sua família ao futuro com a NetFyber Telecom'
+            }
+            
+            for chave, valor in configs_padrao.items():
+                if Configuracao.query.filter_by(chave=chave).first() is None:
+                    config = Configuracao(chave=chave, valor=valor)
+                    db.session.add(config)
+            
+            # Dados de exemplo para posts
+            if Post.query.count() == 0:
+                posts_exemplo = [
+                    Post(
+                        titulo='IA generativa cresce fortemente, mas requer estratégia bem pensada',
+                        conteudo='De acordo com executivos do Itaú e do Banco do Brasil, a inteligência artificial generativa tem grande potencial disruptivo, mas exige investimento significativo e planejamento estratégico — "não basta usar por usar", segundo Marisa Reghini, do BB.\n\n**Muitos bancos preparam uso de "agentes de IA" para automatizar tarefas complexas.**\n<a href="https://www.ibm.com/br-pt/news" target="_blank">IBM Brasil Newsroom</a>\n\n**Apesar do entusiasmo, existe cautela sobre os custos e riscos da adoção.**\n<a href="https://veja.abril.com.br" target="_blank">VEJA</a>',
+                        resumo='IA generativa cresce fortemente, mas requer estratégia bem pensada. De acordo com executivos do Itaú e do Banco do Brasil...',
+                        categoria='tecnologia',
+                        imagem='default.jpg',
+                        link_materia='https://www.valor.com.br/tecnologia/noticia/ia-generativa-cresce-fortemente-mas-requer-estrategia',
+                        data_publicacao=datetime(2025, 11, 1)
+                    )
+                ]
+                
+                for post in posts_exemplo:
+                    post.conteudo_html = formatar_conteudo_inteligente(post.conteudo)
+                    db.session.add(post)
+                
+                print("📝 Posts de exemplo adicionados com sucesso!")
+            
+            # Commit final
+            db.session.commit()
+            print("✅ Banco de dados inicializado com sucesso!")
+            
+        except Exception as e:
+            print(f"❌ Erro ao inicializar banco de dados: {e}")
+            db.session.rollback()
+
+# ========================================
+# EXECUÇÃO PRINCIPAL
+# ========================================
+
 if __name__ == '__main__':
-    # Configurações para Render
-    create_database()  # Tentar criar banco se não existir
+    # Tentar criar banco se estiver no Render
+    if 'RENDER' in os.environ:
+        create_database()
+    
+    # Criar tabelas e dados iniciais
     create_tables()
     
-    # Usar porta do Render ou 10000 como fallback
-    port = int(os.environ.get('PORT', 10000))
-    
+    # Configurações de porta
+    port = int(os.environ.get('PORT', 5000))
     debug_mode = os.environ.get('FLASK_ENV') != 'production'
     
+    # Executar app
     app.run(
         host='0.0.0.0',
         port=port,
         debug=debug_mode,
         threaded=True
-    )    
+    )
