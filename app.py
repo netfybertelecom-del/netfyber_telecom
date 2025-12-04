@@ -29,8 +29,8 @@ ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'netfyber_admin')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@netfyber.com')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Admin@Netfyber2025!')
 
+
 app.config['SECRET_KEY'] = SECRET_KEY
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 app.config['UPLOAD_FOLDER'] = 'static/uploads/blog'
@@ -839,40 +839,25 @@ def create_database():
     """Função para criar banco de dados se não existir (para Render)"""
     database_url = os.environ.get('DATABASE_URL')
     
-    if database_url:
+    if database_url and 'RENDER' in os.environ:
         try:
             # Extrair informações da URL
             parsed_url = urlparse(database_url)
             
-            # Tentar usar psycopg3 primeiro
-            try:
-                import psycopg
-                # Conectar ao PostgreSQL server usando psycopg3
-                conn = psycopg.connect(
-                    dbname='postgres',
-                    user=parsed_url.username,
-                    password=parsed_url.password,
-                    host=parsed_url.hostname,
-                    port=parsed_url.port
-                )
-                conn.autocommit = True
-                cur = conn.cursor()
-                print("✅ Usando psycopg3 (psycopg) para criar banco")
-            except ImportError:
-                # Fallback para psycopg2
-                import psycopg2
-                from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-                
-                conn = psycopg2.connect(
-                    database='postgres',
-                    user=parsed_url.username,
-                    password=parsed_url.password,
-                    host=parsed_url.hostname,
-                    port=parsed_url.port
-                )
-                conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-                cur = conn.cursor()
-                print("✅ Usando psycopg2 (fallback) para criar banco")
+            # Usar psycopg2 (que é o que está instalado)
+            import psycopg2
+            from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+            
+            # Conectar ao PostgreSQL server
+            conn = psycopg2.connect(
+                database='postgres',
+                user=parsed_url.username,
+                password=parsed_url.password,
+                host=parsed_url.hostname,
+                port=parsed_url.port
+            )
+            conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+            cur = conn.cursor()
             
             # Criar banco de dados se não existir
             db_name = parsed_url.path[1:]  # Remove a barra inicial
@@ -882,9 +867,12 @@ def create_database():
             if not exists:
                 cur.execute(f'CREATE DATABASE {db_name}')
                 print(f"✅ Banco de dados '{db_name}' criado")
+            else:
+                print(f"✅ Banco de dados '{db_name}' já existe")
             
             cur.close()
             conn.close()
+            
         except Exception as e:
             print(f"⚠️ Não foi possível criar banco de dados: {e}")
             print("🔧 Usando banco existente ou configurado...")
