@@ -9,9 +9,16 @@ from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 import os
 import uuid
-import re
+import sys
 from sqlalchemy import text
-from urllib.parse import urlparse
+
+# ========================================
+# VERIFICAÇÃO DE VERSÃO DO PYTHON
+# ========================================
+if sys.version_info >= (3, 13):
+    print(f"❌ ERRO: Python {sys.version_info.major}.{sys.version_info.minor} não é compatível!")
+    print("✅ Use Python 3.12.10")
+    sys.exit(1)
 
 # ========================================
 # CONFIGURAÇÕES
@@ -26,12 +33,12 @@ def get_database_url():
     if database_url:
         print(f"🔗 Database URL recebida: {database_url[:50]}...")
         
-        # Convertendo postgres:// para postgresql:// (necessário para SQLAlchemy)
+        # Convertendo postgres:// para postgresql://
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
             print("🔄 URL convertida para postgresql://")
     
-    # Se não tiver URL, usar SQLite para desenvolvimento
+    # Se não tiver URL, usar SQLite
     if not database_url:
         database_url = 'sqlite:///netfyber.db'
         print("📁 Usando SQLite (desenvolvimento)")
@@ -52,7 +59,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 app.config['UPLOAD_FOLDER'] = 'static/uploads/blog'
-app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8MB max upload
+app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8MB
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
@@ -261,8 +268,17 @@ def sobre():
     """Página sobre nós"""
     return render_template('public/sobre.html')
 
+@app.route('/favicon.ico')
+def favicon():
+    """Favicon do site"""
+    return send_from_directory(
+        os.path.join(app.root_path, 'static'),
+        'favicon.ico',
+        mimetype='image/vnd.microsoft.icon'
+    )
+
 # ========================================
-# ROTAS DE ADMINISTRAÇÃO
+# ROTAS DE ADMINISTRAÇÃO - AUTENTICAÇÃO
 # ========================================
 
 @app.route(f'{ADMIN_URL_PREFIX}/login', methods=['GET', 'POST'])
@@ -325,6 +341,10 @@ def admin_logout():
     logout_user()
     flash('Logout realizado com sucesso', 'info')
     return redirect(url_for('admin_login'))
+
+# ========================================
+# ROTAS DE ADMINISTRAÇÃO - PLANOS
+# ========================================
 
 @app.route(f'{ADMIN_URL_PREFIX}/planos')
 @login_required
@@ -419,6 +439,10 @@ def admin_excluir_plano(id):
         flash(f'Erro ao excluir plano: {str(e)}', 'error')
     
     return redirect(url_for('admin_planos'))
+
+# ========================================
+# ROTAS DE ADMINISTRAÇÃO - BLOG
+# ========================================
 
 @app.route(f'{ADMIN_URL_PREFIX}/blog')
 @login_required
@@ -546,6 +570,10 @@ def admin_excluir_post(id):
     
     return redirect(url_for('admin_blog'))
 
+# ========================================
+# ROTAS DE ADMINISTRAÇÃO - CONFIGURAÇÕES
+# ========================================
+
 @app.route(f'{ADMIN_URL_PREFIX}/configuracoes', methods=['GET', 'POST'])
 @login_required
 def admin_configuracoes():
@@ -633,15 +661,6 @@ def init_database():
 # ========================================
 # ROTAS DE UTILIDADE
 # ========================================
-
-@app.route('/favicon.ico')
-def favicon():
-    """Favicon do site"""
-    return send_from_directory(
-        os.path.join(app.root_path, 'static'),
-        'favicon.ico',
-        mimetype='image/vnd.microsoft.icon'
-    )
 
 @app.route('/health')
 def health_check():

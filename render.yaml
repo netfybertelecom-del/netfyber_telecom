@@ -2,9 +2,11 @@ services:
   - type: web
     name: netfyber
     env: python
+    pythonVersion: "3.12.10"  # <-- FORÇA a versão do Python aqui
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
+      mkdir -p static/uploads/blog static/images/blog
     startCommand: gunicorn app:app
     envVars:
       - key: DATABASE_URL
@@ -14,7 +16,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: ADMIN_PASSWORD
-        sync: false
+        value: Admin@Netfyber2025!
       - key: ADMIN_USERNAME
         value: netfyber_admin
       - key: ADMIN_EMAIL
