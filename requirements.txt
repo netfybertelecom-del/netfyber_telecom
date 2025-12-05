@@ -4,5 +4,5 @@ Flask-Login==0.6.3
 Werkzeug==2.3.7
 psycopg2-binary==2.9.9
 python-dotenv==1.0.0
-bleach==6.0.0
 gunicorn==21.2.0
+SQLAlchemy==2.0.23

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import os
 import uuid
 import re
-import bleach
+from sqlalchemy import text  # <-- IMPORTANTE: Adicionar esta linha!
 from urllib.parse import urlparse
 
 # ========================================
@@ -24,35 +24,48 @@ def get_database_url():
     database_url = os.environ.get('DATABASE_URL')
     
     if database_url:
-        print(f"🔗 Database URL recebida: {database_url[:50]}...")
+        print(f"🔗 Database URL recebida: {database_url}")
+        
+        # Verificar se é uma URL completa
+        if not database_url.startswith('postgres://') and not database_url.startswith('postgresql://'):
+            print("❌ URL do banco parece incompleta ou malformada")
+            # Tentar construir a URL completa
+            if 'postgres' in database_url:
+                # Extrair partes da string
+                try:
+                    # Exemplo: "postgresql://user:pass@host:port/dbname"
+                    if '@' in database_url:
+                        parts = database_url.split('@')
+                        creds = parts[0].replace('postgresql://', '')
+                        host_db = parts[1]
+                        
+                        user_pass = creds.split(':')
+                        username = user_pass[0]
+                        password = user_pass[1] if len(user_pass) > 1 else ''
+                        
+                        # Reconstruir URL
+                        database_url = f"postgresql://{username}:{password}@{host_db}"
+                        print(f"🔄 URL reconstruída: {database_url.split('@')[0]}@...")
+                except Exception as e:
+                    print(f"⚠️ Não foi possível reconstruir URL: {e}")
+        
         # Convertendo postgres:// para postgresql://
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
             print("🔄 URL convertida para postgresql://")
-        
-        # Verificar se é uma URL válida
-        try:
-            parsed = urlparse(database_url)
-            if not parsed.netloc:
-                raise ValueError("URL de banco de dados inválida")
-            print(f"✅ URL do banco validada: {parsed.scheme}://{parsed.hostname}")
-        except Exception as e:
-            print(f"❌ Erro na URL do banco: {e}")
-            # Fallback para SQLite se a URL for inválida
-            database_url = 'sqlite:///netfyber.db'
     
     # Se não tiver URL, usar SQLite
     if not database_url:
         database_url = 'sqlite:///netfyber.db'
+        print("📁 Usando SQLite (desenvolvimento)")
     
-    print(f"🏁 URL final do banco: {database_url}")
+    print(f"🏁 URL final do banco: {database_url[:50]}...")
     return database_url
 
 # Configurações
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
 DATABASE_URL = get_database_url()
 ADMIN_URL_PREFIX = os.environ.get('ADMIN_URL_PREFIX', '/gestao-exclusiva-netfyber')
-ADMIN_IPS = os.environ.get('ADMIN_IPS', '127.0.0.1,::1').split(',')
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'netfyber_admin')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@netfyber.com')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Admin@Netfyber2025!')
@@ -78,10 +91,6 @@ if 'RENDER' in os.environ:
         'pool_size': 5,
         'max_overflow': 10,
     }
-    
-    # Ajustar ADMIN_IPS para Render
-    ADMIN_IPS.extend(['0.0.0.0', '127.0.0.1', '::1'])
-    print(f"✅ IPs permitidos: {ADMIN_IPS}")
 
 # ========================================
 # INICIALIZAÇÃO DO BANCO
@@ -169,14 +178,14 @@ def load_user(user_id):
     return AdminUser.query.get(int(user_id))
 
 # ========================================
-# FUNÇÕES AUXILIARES
+# FUNÇÕES AUXILIARES - CRÍTICO: CORRIGIDO!
 # ========================================
 
 def get_configs():
     """Busca configurações do banco - Segura para erros"""
     try:
-        # Testar conexão primeiro
-        db.session.execute('SELECT 1')
+        # CORREÇÃO: Usar text() para SQL bruto no SQLAlchemy 2.0+
+        db.session.execute(text('SELECT 1'))  # <-- AQUI ESTÁ A CORREÇÃO!
         
         configs = {}
         for config in Configuracao.query.all():
@@ -266,27 +275,24 @@ def sobre():
     return render_template('public/sobre.html')
 
 # ========================================
-# ROTA FAVICON (CRÍTICA!)
+# ROTA FAVICON
 # ========================================
 
 @app.route('/favicon.ico')
 def favicon():
-    try:
-        return send_from_directory(
-            os.path.join(app.root_path, 'static/images'),
-            'favicon.ico',
-            mimetype='image/vnd.microsoft.icon'
-        )
-    except:
-        # Retorna uma resposta vazia para não quebrar o site
-        return '', 200
+    return send_from_directory(
+        os.path.join(app.root_path, 'static'),
+        'favicon.ico',
+        mimetype='image/vnd.microsoft.icon'
+    )
 
 # ========================================
-# ROTAS ADMINISTRATIVAS
+# ROTAS ADMINISTRATIVAS - LOGIN CORRIGIDO!
 # ========================================
 
 @app.route(f'{ADMIN_URL_PREFIX}/login', methods=['GET', 'POST'])
 def admin_login():
+    """Login administrativo - CORRIGIDO"""
     if current_user.is_authenticated:
         return redirect(url_for('admin_planos'))
     
@@ -299,17 +305,42 @@ def admin_login():
             return render_template('auth/login.html')
         
         try:
-            user = AdminUser.query.filter_by(username=username).first()
-            
-            if user and user.check_password(password):
-                login_user(user)
-                flash('Login realizado!', 'success')
-                return redirect(url_for('admin_planos'))
+            # Tentar autenticar com as credenciais do ambiente primeiro
+            if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+                # Verificar se o usuário existe no banco
+                user = AdminUser.query.filter_by(username=username).first()
+                if not user:
+                    # Criar usuário se não existir
+                    user = AdminUser(
+                        username=username,
+                        email=ADMIN_EMAIL,
+                        is_active=True
+                    )
+                    user.set_password(password)
+                    db.session.add(user)
+                    db.session.commit()
+                    print(f"👤 Usuário admin criado: {username}")
+                
+                # Fazer login
+                if user.check_password(password):
+                    login_user(user)
+                    flash('Login realizado com sucesso!', 'success')
+                    print(f"✅ Login bem-sucedido para: {username}")
+                    return redirect(url_for('admin_planos'))
+                else:
+                    flash('Credenciais inválidas', 'error')
             else:
-                flash('Credenciais inválidas', 'error')
+                # Tentar usuário do banco
+                user = AdminUser.query.filter_by(username=username).first()
+                if user and user.check_password(password):
+                    login_user(user)
+                    flash('Login realizado!', 'success')
+                    return redirect(url_for('admin_planos'))
+                else:
+                    flash('Credenciais inválidas', 'error')
         except Exception as e:
-            print(f"❌ Erro login: {e}")
-            flash('Erro no servidor', 'error')
+            print(f"❌ Erro no login: {e}")
+            flash(f'Erro no servidor: {str(e)}', 'error')
     
     return render_template('auth/login.html')
 
@@ -379,18 +410,23 @@ def init_database():
             db.create_all()
             print("✅ Tabelas criadas")
             
-            # Verificar se o admin existe
-            admin = AdminUser.query.filter_by(username=ADMIN_USERNAME).first()
+            # Criar usuário admin a partir das variáveis de ambiente
+            admin_username = os.environ.get('ADMIN_USERNAME', 'netfyber_admin')
+            admin_password = os.environ.get('ADMIN_PASSWORD', 'Admin@Netfyber2025!')
+            admin_email = os.environ.get('ADMIN_EMAIL', 'admin@netfyber.com')
+            
+            admin = AdminUser.query.filter_by(username=admin_username).first()
             if not admin:
-                print(f"👤 Criando usuário admin: {ADMIN_USERNAME}")
+                print(f"👤 Criando usuário admin: {admin_username}")
                 admin = AdminUser(
-                    username=ADMIN_USERNAME,
-                    email=ADMIN_EMAIL,
+                    username=admin_username,
+                    email=admin_email,
                     is_active=True
                 )
-                admin.set_password(ADMIN_PASSWORD)
+                admin.set_password(admin_password)
                 db.session.add(admin)
-                print("✅ Admin criado")
+                db.session.commit()
+                print(f"✅ Admin criado: {admin_username}/{admin_password}")
             
             # Configurações padrão
             configs_padrao = {
@@ -426,30 +462,35 @@ def init_database():
 
 @app.route('/health')
 def health_check():
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.utcnow().isoformat()
-    })
+    try:
+        db.session.execute(text('SELECT 1'))
+        return jsonify({
+            'status': 'healthy',
+            'database': 'connected',
+            'timestamp': datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'database': 'disconnected',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500
 
 # ========================================
-# HANDLERS DE ERRO (SIMPLIFICADOS)
+# HANDLERS DE ERRO
 # ========================================
 
 @app.errorhandler(404)
 def not_found_error(error):
-    """404 - Página não encontrada"""
-    print(f"404: {request.url}")
     return render_template('public/404.html'), 404
 
 @app.errorhandler(500)
 def internal_error(error):
-    """500 - Erro interno"""
-    print(f"500: {error}")
     return render_template('public/500.html'), 500
 
 @app.errorhandler(403)
 def forbidden_error(error):
-    """403 - Acesso negado"""
     return render_template('public/403.html'), 403
 
 # ========================================
@@ -466,6 +507,10 @@ init_database()
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
+    
+    print(f"🚀 Iniciando NetFyber na porta {port}...")
+    print(f"🔗 URL do Admin: {ADMIN_URL_PREFIX}/login")
+    print(f"👤 Usuário: {ADMIN_USERNAME}")
     
     app.run(
         host='0.0.0.0',
