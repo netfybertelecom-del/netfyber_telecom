@@ -1,98 +1,98 @@
-# ========================================
-# SEGREDOS E CONFIGURAÇÕES
-# ========================================
-.env
-.env.*
-!.env.example
-secrets/
-credentials/
-config/
-keys/
+    # ========================================
+    # SEGREDOS E CONFIGURAÇÕES
+    # ========================================
+    .env
+    .env.*
+    !.env.example
+    secrets/
+    credentials/
+    config/
+    keys/
 
-# Render
-render.yaml
-render.yml
-.render/
-render-*
+    # Render
+    render.yaml
+    render.yml
+    .render/
+    render-*
 
-# Docker
-Dockerfile*
-docker-compose*
-.dockerignore
+    # Docker
+    Dockerfile*
+    docker-compose*
+    .dockerignore
 
-# ========================================
-# PYTHON
-# ========================================
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+    # ========================================
+    # PYTHON
+    # ========================================
+    __pycache__/
+    *.py[cod]
+    *$py.class
+    *.so
+    .Python
+    build/
+    develop-eggs/
+    dist/
+    downloads/
+    eggs/
+    .eggs/
+    lib/
+    lib64/
+    parts/
+    sdist/
+    var/
+    wheels/
+    pip-wheel-metadata/
+    share/python-wheels/
+    *.egg-info/
+    .installed.cfg
+    *.egg
+    MANIFEST
 
-# Virtual environments
-venv/
-env/
-ENV/
-.env/
-.venv/
+    # Virtual environments
+    venv/
+    env/
+    ENV/
+    .env/
+    .venv/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+    # IDE
+    .vscode/
+    .idea/
+    *.swp
+    *.swo
+    *~
 
-# ========================================
-# BANCO DE DADOS
-# ========================================
-*.db
-*.sqlite
-*.sqlite3
+    # ========================================
+    # BANCO DE DADOS
+    # ========================================
+    *.db
+    *.sqlite
+    *.sqlite3
 
-# ========================================
-# LOGS E TEMPORÁRIOS
-# ========================================
-*.log
-logs/
-*.bak
-*.backup
-*.tmp
-*.temp
+    # ========================================
+    # LOGS E TEMPORÁRIOS
+    # ========================================
+    *.log
+    logs/
+    *.bak
+    *.backup
+    *.tmp
+    *.temp
 
-# ========================================
-# SISTEMA
-# ========================================
-.DS_Store
-Thumbs.db
-desktop.ini
+    # ========================================
+    # SISTEMA
+    # ========================================
+    .DS_Store
+    Thumbs.db
+    desktop.ini
 
-# ========================================
-# UPLOADS (mantenha estrutura, mas não os arquivos)
-# ========================================
-static/uploads/*
-!static/uploads/.gitkeep
+    # ========================================
+    # UPLOADS (mantenha estrutura, mas não os arquivos)
+    # ========================================
+    static/uploads/*
+    !static/uploads/.gitkeep
 
-# ========================================
-# PROJETO NETFYBER
-# ========================================
-instance/
-.netfyber-cache/
+    # ========================================
+    # PROJETO NETFYBER
+    # ========================================
+    instance/
+    .netfyber-cache/

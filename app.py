@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 NetFyber Telecom - Sistema Completo
-Versão corrigida para hospedagem no Render
+Versão corrigida para Render
 """
 
 import os
@@ -21,12 +21,6 @@ from dotenv import load_dotenv
 # ========================================
 load_dotenv()
 
-# Verificar versão Python
-if sys.version_info >= (3, 13):
-    print(f"❌ ERRO: Python {sys.version_info.major}.{sys.version_info.minor} não suportado!")
-    print("✅ Use Python 3.12.10")
-    sys.exit(1)
-
 app = Flask(__name__)
 
 # ========================================
@@ -37,46 +31,35 @@ def get_database_url():
     db_url = os.environ.get('DATABASE_URL')
     
     if db_url:
+        # Se estiver no Render, usa PostgreSQL
         if db_url.startswith('postgres://'):
             db_url = db_url.replace('postgres://', 'postgresql://', 1)
-            print("🔄 URL convertida para postgresql://")
+        return db_url
     else:
-        db_url = 'sqlite:///netfyber.db'
-        print("📁 Usando SQLite (desenvolvimento)")
-    
-    return db_url
+        # Desenvolvimento local
+        return 'sqlite:///netfyber.db'
 
-# Configurações
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-production-2025')
+# Configurações principais
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'netfyber-secret-key-2025')
 app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads/blog'
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024
-app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 horas
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400
 
-# Configuração específica para Render
-if 'RENDER' in os.environ:
-    print("🚀 Ambiente Render detectado")
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_recycle': 300,
-        'pool_pre_ping': True,
-        'pool_size': 5,
-        'max_overflow': 10,
-    }
-
-# Variáveis de admin
-ADMIN_URL_PREFIX = os.environ.get('ADMIN_URL_PREFIX', '/gestao-exclusiva-netfyber')
-ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'netfyber_admin')
+# Variáveis de admin (CORRIGIDAS)
+ADMIN_URL_PREFIX = os.environ.get('ADMIN_URL_PREFIX', 'gestao-exclusiva-netfyber')
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@netfyber.com')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Admin@Netfyber2025!')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Netfyber@2025')
 
 # ========================================
-# BANCO DE DADOS
+# INICIALIZAÇÃO DE EXTENSÕES
 # ========================================
 db = SQLAlchemy(app)
 
 # ========================================
-# MODELOS
+# MODELOS DO BANCO DE DADOS
 # ========================================
 class AdminUser(UserMixin, db.Model):
     __tablename__ = 'admin_users'
@@ -141,7 +124,7 @@ class Post(db.Model):
         return "/static/images/blog/default.jpg"
 
 # ========================================
-# LOGIN MANAGER
+# SISTEMA DE LOGIN
 # ========================================
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -154,45 +137,36 @@ def load_user(user_id):
     return AdminUser.query.get(int(user_id))
 
 # ========================================
-# FUNÇÕES AUXILIARES CORRIGIDAS
+# FUNÇÕES AUXILIARES
 # ========================================
 def get_configs():
-    """Busca configurações do banco de dados com tratamento robusto de erro"""
-    # Configurações padrão (definidas ANTES do try)
-    default_configs = {
-        'telefone_contato': '(63) 8494-1778',
-        'email_contato': 'contato@netfyber.com',
-        'endereco': 'AV. Tocantins – 934, Centro – Sítio Novo – TO<br>Axixá TO / Juverlândia / São Pedro / Folha Seca / Morada Nova / Santa Luzia / Boa Esperança',
-        'horario_segunda_sexta': '08h às 18h',
-        'horario_sabado': '08h às 13h',
-        'whatsapp_numero': '556384941778',
-        'instagram_url': 'https://www.instagram.com/netfybertelecom',
-        'hero_imagem': 'images/familia.png',
-        'hero_titulo': 'Internet de Alta Velocidade',
-        'hero_subtitulo': 'Conecte sua família ao futuro com a NetFyber Telecom'
-    }
-    
+    """Busca configurações do banco de dados"""
     try:
-        # Testar conexão com o banco
-        db.session.execute(text('SELECT 1'))
-        
         configs = {}
         for config in Configuracao.query.all():
             configs[config.chave] = config.valor
         
-        print(f"✅ Configurações carregadas: {len(configs)} itens")
+        # Configurações padrão se não existirem
+        defaults = {
+            'telefone_contato': '(63) 8494-1778',
+            'email_contato': 'contato@netfyber.com',
+            'endereco': 'AV. Tocantins – 934, Centro – Sítio Novo – TO',
+            'horario_segunda_sexta': '08h às 18h',
+            'horario_sabado': '08h às 13h',
+            'whatsapp_numero': '556384941778',
+            'instagram_url': 'https://www.instagram.com/netfybertelecom',
+            'hero_imagem': 'images/familia.png',
+            'hero_titulo': 'Internet de Alta Velocidade',
+            'hero_subtitulo': 'Conecte sua família ao futuro com a NetFyber Telecom'
+        }
         
-        # Mesclar com configurações padrão se faltarem
-        for key, value in default_configs.items():
+        for key, value in defaults.items():
             if key not in configs:
                 configs[key] = value
         
         return configs
-        
-    except Exception as e:
-        # Não imprimir o erro para não poluir os logs
-        # Apenas retornar as configurações padrão
-        return default_configs
+    except:
+        return defaults
 
 def allowed_file(filename):
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -213,32 +187,8 @@ def save_uploaded_file(file):
         file.save(filepath)
         return unique_filename
     except Exception as e:
-        print(f"❌ Erro ao salvar arquivo: {e}")
+        print(f"Erro ao salvar arquivo: {e}")
         return None
-
-# ========================================
-# HANDLERS DE SESSÃO (NOVO)
-# ========================================
-@app.before_request
-def before_request():
-    """Garante que a sessão do banco está limpa antes de cada requisição"""
-    try:
-        # Fechar qualquer sessão antiga
-        db.session.close()
-    except:
-        pass
-
-@app.teardown_request
-def teardown_request(exception=None):
-    """Limpa a sessão após cada requisição"""
-    if exception:
-        db.session.rollback()
-    else:
-        try:
-            db.session.commit()
-        except:
-            db.session.rollback()
-    db.session.close()
 
 # ========================================
 # CONTEXT PROCESSOR
@@ -272,14 +222,15 @@ def velocimetro():
 def sobre():
     return render_template('public/sobre.html')
 
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory('static', 'favicon.ico')
+# ========================================
+# ROTAS DE ADMIN (CORRIGIDAS)
+# ========================================
+@app.route('/' + ADMIN_URL_PREFIX)
+def admin_redirect():
+    """Redireciona para o login do admin"""
+    return redirect(url_for('admin_login'))
 
-# ========================================
-# ROTAS DE ADMIN
-# ========================================
-@app.route(f'{ADMIN_URL_PREFIX}/login', methods=['GET', 'POST'])
+@app.route('/' + ADMIN_URL_PREFIX + '/login', methods=['GET', 'POST'])
 def admin_login():
     if current_user.is_authenticated:
         return redirect(url_for('admin_planos'))
@@ -288,13 +239,20 @@ def admin_login():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         
+        # Verificar credenciais padrão
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             user = AdminUser.query.filter_by(username=username).first()
             if not user:
-                user = AdminUser(username=username, email=ADMIN_EMAIL, is_active=True)
+                # Criar usuário admin se não existir
+                user = AdminUser(
+                    username=username, 
+                    email=ADMIN_EMAIL,
+                    is_active=True
+                )
                 user.set_password(password)
                 db.session.add(user)
                 db.session.commit()
+                print(f"✅ Usuário admin criado: {username}")
             
             login_user(user)
             flash('Login realizado com sucesso!', 'success')
@@ -304,20 +262,20 @@ def admin_login():
     
     return render_template('auth/login.html')
 
-@app.route(f'{ADMIN_URL_PREFIX}/logout')
+@app.route('/' + ADMIN_URL_PREFIX + '/logout')
 @login_required
 def admin_logout():
     logout_user()
     flash('Logout realizado com sucesso', 'info')
-    return redirect(url_for('admin_login'))
+    return redirect(url_for('index'))
 
-@app.route(f'{ADMIN_URL_PREFIX}/planos')
+@app.route('/' + ADMIN_URL_PREFIX + '/planos')
 @login_required
 def admin_planos():
     planos = Plano.query.order_by(Plano.ordem_exibicao).all()
     return render_template('admin/planos.html', planos=planos)
 
-@app.route(f'{ADMIN_URL_PREFIX}/planos/novo', methods=['GET', 'POST'])
+@app.route('/' + ADMIN_URL_PREFIX + '/planos/novo', methods=['GET', 'POST'])
 @login_required
 def adicionar_plano():
     if request.method == 'POST':
@@ -340,7 +298,7 @@ def adicionar_plano():
     
     return render_template('admin/plano_form.html', plano=None)
 
-@app.route(f'{ADMIN_URL_PREFIX}/planos/editar/<int:plano_id>', methods=['GET', 'POST'])
+@app.route('/' + ADMIN_URL_PREFIX + '/planos/editar/<int:plano_id>', methods=['GET', 'POST'])
 @login_required
 def editar_plano(plano_id):
     plano = Plano.query.get_or_404(plano_id)
@@ -361,7 +319,7 @@ def editar_plano(plano_id):
     
     return render_template('admin/plano_form.html', plano=plano)
 
-@app.route(f'{ADMIN_URL_PREFIX}/planos/excluir/<int:plano_id>', methods=['POST'])
+@app.route('/' + ADMIN_URL_PREFIX + '/planos/excluir/<int:plano_id>', methods=['POST'])
 @login_required
 def excluir_plano(plano_id):
     try:
@@ -375,13 +333,13 @@ def excluir_plano(plano_id):
     
     return redirect(url_for('admin_planos'))
 
-@app.route(f'{ADMIN_URL_PREFIX}/blog')
+@app.route('/' + ADMIN_URL_PREFIX + '/blog')
 @login_required
 def admin_blog():
     posts = Post.query.order_by(Post.data_publicacao.desc()).all()
     return render_template('admin/blog.html', posts=posts)
 
-@app.route(f'{ADMIN_URL_PREFIX}/blog/novo', methods=['GET', 'POST'])
+@app.route('/' + ADMIN_URL_PREFIX + '/blog/novo', methods=['GET', 'POST'])
 @login_required
 def adicionar_post():
     if request.method == 'POST':
@@ -393,6 +351,7 @@ def adicionar_post():
                 resumo=conteudo[:150] + '...' if len(conteudo) > 150 else conteudo,
                 categoria=request.form.get('categoria', '').strip(),
                 link_materia=request.form.get('link_materia', '').strip(),
+                data_publicacao=datetime.strptime(request.form.get('data_publicacao'), '%d/%m/%Y'),
                 ativo=True
             )
             
@@ -410,9 +369,9 @@ def adicionar_post():
             db.session.rollback()
             flash(f'Erro: {str(e)}', 'error')
     
-    return render_template('admin/post_form.html', post=None)
+    return render_template('admin/post_form.html', post=None, data_hoje=datetime.now().strftime('%d/%m/%Y'))
 
-@app.route(f'{ADMIN_URL_PREFIX}/blog/editar/<int:post_id>', methods=['GET', 'POST'])
+@app.route('/' + ADMIN_URL_PREFIX + '/blog/editar/<int:post_id>', methods=['GET', 'POST'])
 @login_required
 def editar_post(post_id):
     post = Post.query.get_or_404(post_id)
@@ -439,9 +398,9 @@ def editar_post(post_id):
             db.session.rollback()
             flash(f'Erro: {str(e)}', 'error')
     
-    return render_template('admin/post_form.html', post=post)
+    return render_template('admin/post_form.html', post=post, data_hoje=post.data_publicacao.strftime('%d/%m/%Y'))
 
-@app.route(f'{ADMIN_URL_PREFIX}/blog/excluir/<int:post_id>', methods=['POST'])
+@app.route('/' + ADMIN_URL_PREFIX + '/blog/excluir/<int:post_id>', methods=['POST'])
 @login_required
 def excluir_post(post_id):
     try:
@@ -455,7 +414,7 @@ def excluir_post(post_id):
     
     return redirect(url_for('admin_blog'))
 
-@app.route(f'{ADMIN_URL_PREFIX}/configuracoes', methods=['GET', 'POST'])
+@app.route('/' + ADMIN_URL_PREFIX + '/configuracoes', methods=['GET', 'POST'])
 @login_required
 def admin_configuracoes():
     if request.method == 'POST':
@@ -479,7 +438,7 @@ def admin_configuracoes():
     return render_template('admin/configuracoes.html', configs=configs)
 
 # ========================================
-# UTILIDADES
+# ROTAS UTILITÁRIAS
 # ========================================
 @app.route('/health')
 def health_check():
@@ -495,8 +454,12 @@ def health_check():
             'error': str(e)
         }), 500
 
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory('static', 'favicon.ico')
+
 # ========================================
-# HANDLERS DE ERRO (CORRIGIDOS)
+# HANDLERS DE ERRO
 # ========================================
 @app.errorhandler(404)
 def not_found_error(error):
@@ -511,49 +474,33 @@ def forbidden_error(error):
     return render_template('public/403.html'), 403
 
 # ========================================
-# INICIALIZAÇÃO ROBUSTA DO BANCO
+# INICIALIZAÇÃO DO BANCO DE DADOS
 # ========================================
 def init_database():
-    """Inicializa o banco de dados com tratamento completo de erros"""
-    max_retries = 3
-    retry_count = 0
-    
-    while retry_count < max_retries:
+    """Inicializa o banco de dados com dados padrão"""
+    with app.app_context():
         try:
-            print(f"🔧 Tentativa {retry_count + 1}/{max_retries}: Inicializando banco de dados...")
-            
-            # Verificar se já existe conexão ativa
-            try:
-                db.session.execute(text('SELECT 1'))
-            except:
-                print("🔄 Reconectando ao banco...")
-            
-            # Criar tabelas se não existirem (com IF NOT EXISTS implícito)
+            # Criar tabelas se não existirem
             db.create_all()
-            print("✅ Tabelas verificadas/criadas")
+            print("✅ Tabelas criadas/verificadas")
             
             # Criar usuário admin se não existir
-            admin_username = os.environ.get('ADMIN_USERNAME', 'netfyber_admin')
-            admin_password = os.environ.get('ADMIN_PASSWORD', 'Admin@Netfyber2025!')
-            admin_email = os.environ.get('ADMIN_EMAIL', 'admin@netfyber.com')
-            
-            admin = AdminUser.query.filter_by(username=admin_username).first()
+            admin = AdminUser.query.filter_by(username=ADMIN_USERNAME).first()
             if not admin:
-                print(f"👤 Criando usuário admin: {admin_username}")
                 admin = AdminUser(
-                    username=admin_username,
-                    email=admin_email,
+                    username=ADMIN_USERNAME,
+                    email=ADMIN_EMAIL,
                     is_active=True
                 )
-                admin.set_password(admin_password)
+                admin.set_password(ADMIN_PASSWORD)
                 db.session.add(admin)
-                print(f"✅ Admin criado: {admin_username}")
+                print(f"✅ Usuário admin criado: {ADMIN_USERNAME}")
             
             # Configurações padrão
             configs_padrao = [
                 ('telefone_contato', '(63) 8494-1778', 'Telefone de contato'),
                 ('email_contato', 'contato@netfyber.com', 'Email de contato'),
-                ('endereco', 'AV. Tocantins – 934, Centro – Sítio Novo – TO<br>Axixá TO / Juverlândia / São Pedro / Folha Seca / Morada Nova / Santa Luzia / Boa Esperança', 'Endereço completo'),
+                ('endereco', 'AV. Tocantins – 934, Centro – Sítio Novo – TO', 'Endereço completo'),
                 ('horario_segunda_sexta', '08h às 18h', 'Horário de segunda a sexta'),
                 ('horario_sabado', '08h às 13h', 'Horário de sábado'),
                 ('whatsapp_numero', '556384941778', 'Número do WhatsApp para contato'),
@@ -564,21 +511,12 @@ def init_database():
             ]
             
             for chave, valor, descricao in configs_padrao:
-                config = Configuracao.query.filter_by(chave=chave).first()
-                if not config:
-                    config = Configuracao(
-                        chave=chave,
-                        valor=valor,
-                        descricao=descricao,
-                        created_at=datetime.utcnow()
-                    )
+                if not Configuracao.query.filter_by(chave=chave).first():
+                    config = Configuracao(chave=chave, valor=valor, descricao=descricao)
                     db.session.add(config)
-                    print(f"⚙️  Configuração padrão adicionada: {chave}")
             
-            # Planos de exemplo (apenas se não houver nenhum plano)
+            # Planos de exemplo
             if Plano.query.count() == 0:
-                print("📡 Criando planos de exemplo...")
-                
                 planos_exemplo = [
                     {
                         'nome': '100 MEGA',
@@ -610,57 +548,33 @@ def init_database():
                 ]
                 
                 for plano_data in planos_exemplo:
-                    plano = Plano(
-                        nome=plano_data['nome'],
-                        preco=plano_data['preco'],
-                        velocidade=plano_data['velocidade'],
-                        features=plano_data['features'],
-                        recomendado=plano_data['recomendado'],
-                        ordem_exibicao=plano_data['ordem_exibicao'],
-                        ativo=plano_data['ativo'],
-                        created_at=datetime.utcnow()
-                    )
+                    plano = Plano(**plano_data)
                     db.session.add(plano)
             
-            # Commit final
             db.session.commit()
-            print("🎉 Banco inicializado com sucesso!")
-            return True
+            print("🎉 Banco de dados inicializado com sucesso!")
             
         except Exception as e:
-            retry_count += 1
-            print(f"❌ Erro na tentativa {retry_count}: {e}")
             db.session.rollback()
-            
-            if retry_count < max_retries:
-                print(f"⏳ Aguardando 2 segundos antes de tentar novamente...")
-                import time
-                time.sleep(2)
-            else:
-                print("💥 Todas as tentativas falharam. Verifique a conexão com o banco.")
-                return False
+            print(f"❌ Erro ao inicializar banco: {e}")
 
 # ========================================
-# INICIALIZAÇÃO DO BANCO AO INICIAR O APP
-# ========================================
-with app.app_context():
-    print("🚀 Inicializando banco de dados...")
-    try:
-        init_database()
-    except Exception as e:
-        print(f"⚠️  Erro na inicialização do banco: {e}")
-
-# ========================================
-# MAIN
+# EXECUÇÃO PRINCIPAL
 # ========================================
 if __name__ == '__main__':
+    # Inicializar banco de dados
+    init_database()
+    
+    # Configurações do servidor
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
     
+    print(f"🚀 NetFyber Telecom iniciando...")
     print(f"🌐 Porta: {port}")
-    print(f"🔗 Painel Admin: {ADMIN_URL_PREFIX}/login")
-    print(f"👤 Usuário admin: {ADMIN_USERNAME}")
-    print(f"🔧 Modo debug: {debug}")
+    print(f"🔗 Site: http://localhost:{port}")
+    print(f"👑 Admin: http://localhost:{port}/{ADMIN_URL_PREFIX}/login")
+    print(f"👤 Usuário: {ADMIN_USERNAME}")
+    print(f"🔑 Senha: {ADMIN_PASSWORD}")
     
     app.run(
         host='0.0.0.0',
