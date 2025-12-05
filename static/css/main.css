@@ -262,24 +262,25 @@ body {
     color: var(--gray-color);
 }
 
-/* ===== CARROSSEL DE PLANOS ===== */
+/* ===== CARROSSEL DE PLANOS - CORRIGIDO COMPLETAMENTE ===== */
 .carrossel-planos-container {
     max-width: 1200px;
     margin: 0 auto;
     overflow: hidden;
     border-radius: 20px;
-    padding: 0 3rem;
+    padding: 0 1rem;
+    position: relative;
 }
 
 .carrossel-planos {
     display: flex;
-    transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    touch-action: pan-y;
+    transition: transform 0.5s ease;
     will-change: transform;
 }
 
 .carrossel-item {
     flex: 0 0 100%;
+    min-width: 100%;
     padding: 1rem;
     box-sizing: border-box;
     transition: opacity 0.3s ease;
@@ -300,30 +301,35 @@ body {
     box-shadow: 0 4px 15px rgba(1, 16, 113, 0.3);
     z-index: 10;
     opacity: 0.9;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
 }
 
-.carrossel-controle:hover {
+.carrossel-controle:hover:not(:disabled) {
     opacity: 1;
-    transform: scale(1.1);
+    transform: translateY(-50%) scale(1.1);
     box-shadow: 0 6px 20px rgba(1, 16, 113, 0.4);
 }
 
 .carrossel-controle:disabled {
     opacity: 0.3;
     cursor: not-allowed;
-    transform: none;
 }
 
 .carrossel-anterior {
-    left: 1rem;
+    left: 10px;
 }
 
 .carrossel-proximo {
-    right: 1rem;
+    right: 10px;
 }
 
 .carrossel-indicadores {
-    bottom: -2rem;
+    position: absolute;
+    bottom: -30px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     gap: 0.5rem;
     z-index: 10;
@@ -338,6 +344,7 @@ body {
     cursor: pointer;
     transition: all 0.3s ease;
     opacity: 0.7;
+    padding: 0;
 }
 
 .carrossel-indicador:hover {
@@ -351,13 +358,13 @@ body {
     transform: scale(1.2);
 }
 
-/* Cards de Planos no Carrossel */
+/* Cards de Planos */
 .plan-card {
     background: white;
     border-radius: 20px;
-    padding: 2.5rem;
+    padding: 2rem;
     height: 100%;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     transition: all 0.3s ease;
     border: 2px solid transparent;
     position: relative;
@@ -376,8 +383,7 @@ body {
 
 .plan-card.recommended {
     border-color: var(--warning-color);
-    transform: scale(1.02);
-    box-shadow: 0 15px 50px rgba(255, 193, 7, 0.2);
+    box-shadow: 0 15px 40px rgba(255, 193, 7, 0.2);
 }
 
 .plan-card.recommended::before {
@@ -387,6 +393,9 @@ body {
 .price-tag {
     background: linear-gradient(135deg, #fff3cd, #ffeaa7);
     border: 2px solid #ffc107;
+    border-radius: 50px;
+    padding: 0.5rem 1.5rem;
+    display: inline-block;
 }
 
 /* Estados de Hover para Cards */
@@ -689,16 +698,17 @@ body {
     color: var(--success-color) !important;
 }
 
-/* ===== RESPONSIVIDADE ===== */
+/* ===== RESPONSIVIDADE DO CARROSSEL ===== */
 
 /* Tablet */
 @media (min-width: 768px) {
     .carrossel-item {
         flex: 0 0 50%;
+        min-width: 50%;
     }
     
     .carrossel-planos-container {
-        padding: 0 4rem;
+        padding: 0 2rem;
     }
 }
 
@@ -706,8 +716,15 @@ body {
 @media (min-width: 992px) {
     .carrossel-item {
         flex: 0 0 33.333%;
+        min-width: 33.333%;
+    }
+    
+    .carrossel-planos-container {
+        padding: 0 3rem;
     }
 }
+
+/* ===== RESPONSIVIDADE GERAL ===== */
 
 /* Mobile Large */
 @media (max-width: 768px) {
@@ -734,21 +751,17 @@ body {
         max-width: 280px;
     }
     
-    .carrossel-planos-container {
-        padding: 0 2rem;
-    }
-    
     .carrossel-controle {
         width: 40px;
         height: 40px;
     }
     
     .carrossel-anterior {
-        left: 0.5rem;
+        left: 5px;
     }
     
     .carrossel-proximo {
-        right: 0.5rem;
+        right: 5px;
     }
     
     .plan-card.recommended {
@@ -756,7 +769,7 @@ body {
     }
     
     .plan-card {
-        padding: 2rem 1.5rem;
+        padding: 1.5rem;
     }
     
     .cookie-banner .container {
@@ -812,21 +825,17 @@ body {
         font-size: 2rem;
     }
     
-    .carrossel-planos-container {
-        padding: 0 1rem;
-    }
-    
     .carrossel-controle {
         width: 35px;
         height: 35px;
     }
     
     .carrossel-anterior {
-        left: 0.25rem;
+        left: 5px;
     }
     
     .carrossel-proximo {
-        right: 0.25rem;
+        right: 5px;
     }
     
     .cookie-banner {
