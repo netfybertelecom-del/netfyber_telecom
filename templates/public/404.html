@@ -1,12 +1,61 @@
-{% extends "public/base.html" %}
-
-{% block title %}Página não encontrada - NetFyber{% endblock %}
-
-{% block content %}
-<div class="container text-center py-5">
-    <h1 class="display-1">404</h1>
-    <h2>Página não encontrada</h2>
-    <p class="lead mb-4">A página que você está procurando não existe.</p>
-    <a href="{{ url_for('index') }}" class="btn btn-primary">Voltar para página inicial</a>
-</div>
-{% endblock %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Página não encontrada</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #011071 0%, #04a3ff 100%);
+            color: white;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+        }
+        h1 {
+            font-size: 6rem;
+            margin: 0;
+            color: white;
+        }
+        h2 {
+            font-size: 2rem;
+            margin: 0 0 20px 0;
+        }
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        .btn {
+            display: inline-block;
+            background: white;
+            color: #011071;
+            padding: 12px 30px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>404</h1>
+        <h2>Página não encontrada</h2>
+        <p>A página que você está procurando não existe ou foi movida.</p>
+        <a href="/" class="btn">Voltar para página inicial</a>
+    </div>
+</body>
+</html>

@@ -1,12 +1,61 @@
-{% extends "public/base.html" %}
-
-{% block title %}Acesso negado - NetFyber{% endblock %}
-
-{% block content %}
-<div class="container text-center py-5">
-    <h1 class="display-1">403</h1>
-    <h2>Acesso negado</h2>
-    <p class="lead mb-4">Você não tem permissão para acessar esta página.</p>
-    <a href="{{ url_for('index') }}" class="btn btn-primary">Voltar para página inicial</a>
-</div>
-{% endblock %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>403 - Acesso negado</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ffc107 0%, #ff8c00 100%);
+            color: white;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+        }
+        h1 {
+            font-size: 6rem;
+            margin: 0;
+            color: white;
+        }
+        h2 {
+            font-size: 2rem;
+            margin: 0 0 20px 0;
+        }
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        .btn {
+            display: inline-block;
+            background: white;
+            color: #ff8c00;
+            padding: 12px 30px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>403</h1>
+        <h2>Acesso negado</h2>
+        <p>Você não tem permissão para acessar esta página.</p>
+        <a href="/" class="btn">Voltar para página inicial</a>
+    </div>
+</body>
+</html>

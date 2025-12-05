@@ -11,7 +11,7 @@ services:
         fromDatabase:
           name: netfyber-db
           property: connectionString
-      - key: FLASK_ENV
-        value: production
       - key: SECRET_KEY
         generateValue: true
+      - key: ADMIN_PASSWORD
+        sync: false
