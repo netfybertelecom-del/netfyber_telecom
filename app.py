@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import os
 import uuid
 import re
-from sqlalchemy import text  # <-- IMPORTANTE: Adicionar esta linha!
+from sqlalchemy import text
 from urllib.parse import urlparse
 
 # ========================================
@@ -20,49 +20,25 @@ from urllib.parse import urlparse
 app = Flask(__name__)
 
 def get_database_url():
-    """Obtém e corrige a URL do banco de dados para o Render"""
+    """Obtém e corrige a URL do banco de dados"""
     database_url = os.environ.get('DATABASE_URL')
     
     if database_url:
-        print(f"🔗 Database URL recebida: {database_url}")
+        print(f"🔗 Database URL recebida: {database_url[:50]}...")
         
-        # Verificar se é uma URL completa
-        if not database_url.startswith('postgres://') and not database_url.startswith('postgresql://'):
-            print("❌ URL do banco parece incompleta ou malformada")
-            # Tentar construir a URL completa
-            if 'postgres' in database_url:
-                # Extrair partes da string
-                try:
-                    # Exemplo: "postgresql://user:pass@host:port/dbname"
-                    if '@' in database_url:
-                        parts = database_url.split('@')
-                        creds = parts[0].replace('postgresql://', '')
-                        host_db = parts[1]
-                        
-                        user_pass = creds.split(':')
-                        username = user_pass[0]
-                        password = user_pass[1] if len(user_pass) > 1 else ''
-                        
-                        # Reconstruir URL
-                        database_url = f"postgresql://{username}:{password}@{host_db}"
-                        print(f"🔄 URL reconstruída: {database_url.split('@')[0]}@...")
-                except Exception as e:
-                    print(f"⚠️ Não foi possível reconstruir URL: {e}")
-        
-        # Convertendo postgres:// para postgresql://
+        # Convertendo postgres:// para postgresql:// (necessário para SQLAlchemy)
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
             print("🔄 URL convertida para postgresql://")
     
-    # Se não tiver URL, usar SQLite
+    # Se não tiver URL, usar SQLite para desenvolvimento
     if not database_url:
         database_url = 'sqlite:///netfyber.db'
         print("📁 Usando SQLite (desenvolvimento)")
     
-    print(f"🏁 URL final do banco: {database_url[:50]}...")
     return database_url
 
-# Configurações
+# Configurações do app
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
 DATABASE_URL = get_database_url()
 ADMIN_URL_PREFIX = os.environ.get('ADMIN_URL_PREFIX', '/gestao-exclusiva-netfyber')
@@ -70,12 +46,13 @@ ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'netfyber_admin')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@netfyber.com')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Admin@Netfyber2025!')
 
+# Configurações Flask
 app.config['SECRET_KEY'] = SECRET_KEY
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 app.config['UPLOAD_FOLDER'] = 'static/uploads/blog'
-app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8MB max upload
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
@@ -84,7 +61,7 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 # ========================================
 
 if 'RENDER' in os.environ:
-    print("🚀 Ambiente Render detectado - Ajustando configurações...")
+    print("🚀 Ambiente Render detectado - Configurando pool de conexões...")
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'pool_recycle': 300,
         'pool_pre_ping': True,
@@ -178,14 +155,14 @@ def load_user(user_id):
     return AdminUser.query.get(int(user_id))
 
 # ========================================
-# FUNÇÕES AUXILIARES - CRÍTICO: CORRIGIDO!
+# FUNÇÕES AUXILIARES
 # ========================================
 
 def get_configs():
-    """Busca configurações do banco - Segura para erros"""
+    """Busca configurações do banco de dados"""
     try:
-        # CORREÇÃO: Usar text() para SQL bruto no SQLAlchemy 2.0+
-        db.session.execute(text('SELECT 1'))  # <-- AQUI ESTÁ A CORREÇÃO!
+        # Testar conexão com o banco
+        db.session.execute(text('SELECT 1'))
         
         configs = {}
         for config in Configuracao.query.all():
@@ -195,8 +172,8 @@ def get_configs():
         return configs
         
     except Exception as e:
-        print(f"⚠️ Erro ao buscar configurações (usando padrão): {e}")
-        # Retorna configurações padrão
+        print(f"⚠️ Erro ao buscar configurações: {e}")
+        # Configurações padrão
         return {
             'telefone_contato': '(63) 8494-1778',
             'email_contato': 'contato@netfyber.com',
@@ -211,9 +188,11 @@ def get_configs():
         }
 
 def allowed_file(filename):
+    """Verifica se o arquivo é permitido"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def save_uploaded_file(file):
+    """Salva um arquivo enviado"""
     if not file or file.filename == '':
         return None
     
@@ -226,18 +205,19 @@ def save_uploaded_file(file):
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
         file.save(filepath)
+        print(f"📁 Arquivo salvo: {unique_filename}")
         return unique_filename
     except Exception as e:
         print(f"❌ Erro ao salvar arquivo: {e}")
         return None
 
 # ========================================
-# CONTEXT PROCESSOR - CRÍTICO!
+# CONTEXT PROCESSOR
 # ========================================
 
 @app.context_processor
 def inject_configs():
-    """INJEÇÃO GLOBAL - Faz configs estar disponível em TODOS os templates"""
+    """Injeta configurações em todos os templates"""
     return {'configs': get_configs()}
 
 # ========================================
@@ -246,53 +226,48 @@ def inject_configs():
 
 @app.route('/')
 def index():
+    """Página inicial"""
     return render_template('public/index.html')
 
 @app.route('/planos')
 def planos():
+    """Página de planos"""
     try:
         planos_data = Plano.query.filter_by(ativo=True).order_by(Plano.ordem_exibicao).all()
         return render_template('public/planos.html', planos=planos_data)
     except Exception as e:
-        print(f"❌ Erro /planos: {e}")
+        print(f"❌ Erro ao carregar planos: {e}")
+        flash('Erro ao carregar os planos', 'error')
         return render_template('public/planos.html', planos=[])
 
 @app.route('/blog')
 def blog():
+    """Página do blog"""
     try:
         posts = Post.query.filter_by(ativo=True).order_by(Post.data_publicacao.desc()).all()
         return render_template('public/blog.html', posts=posts)
     except Exception as e:
-        print(f"❌ Erro /blog: {e}")
+        print(f"❌ Erro ao carregar blog: {e}")
+        flash('Erro ao carregar o blog', 'error')
         return render_template('public/blog.html', posts=[])
 
 @app.route('/velocimetro')
 def velocimetro():
+    """Página do velocímetro"""
     return render_template('public/velocimetro.html')
 
 @app.route('/sobre')
 def sobre():
+    """Página sobre nós"""
     return render_template('public/sobre.html')
 
 # ========================================
-# ROTA FAVICON
-# ========================================
-
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(
-        os.path.join(app.root_path, 'static'),
-        'favicon.ico',
-        mimetype='image/vnd.microsoft.icon'
-    )
-
-# ========================================
-# ROTAS ADMINISTRATIVAS - LOGIN CORRIGIDO!
+# ROTAS DE ADMINISTRAÇÃO
 # ========================================
 
 @app.route(f'{ADMIN_URL_PREFIX}/login', methods=['GET', 'POST'])
 def admin_login():
-    """Login administrativo - CORRIGIDO"""
+    """Página de login administrativo"""
     if current_user.is_authenticated:
         return redirect(url_for('admin_planos'))
     
@@ -305,9 +280,8 @@ def admin_login():
             return render_template('auth/login.html')
         
         try:
-            # Tentar autenticar com as credenciais do ambiente primeiro
+            # Verificar se é o usuário admin das variáveis de ambiente
             if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-                # Verificar se o usuário existe no banco
                 user = AdminUser.query.filter_by(username=username).first()
                 if not user:
                     # Criar usuário se não existir
@@ -325,16 +299,16 @@ def admin_login():
                 if user.check_password(password):
                     login_user(user)
                     flash('Login realizado com sucesso!', 'success')
-                    print(f"✅ Login bem-sucedido para: {username}")
+                    print(f"✅ Login bem-sucedido: {username}")
                     return redirect(url_for('admin_planos'))
                 else:
                     flash('Credenciais inválidas', 'error')
             else:
-                # Tentar usuário do banco
+                # Tentar autenticar com usuário do banco
                 user = AdminUser.query.filter_by(username=username).first()
                 if user and user.check_password(password):
                     login_user(user)
-                    flash('Login realizado!', 'success')
+                    flash('Login realizado com sucesso!', 'success')
                     return redirect(url_for('admin_planos'))
                 else:
                     flash('Credenciais inválidas', 'error')
@@ -347,35 +321,235 @@ def admin_login():
 @app.route(f'{ADMIN_URL_PREFIX}/logout')
 @login_required
 def admin_logout():
+    """Logout do administrador"""
     logout_user()
-    flash('Logout realizado', 'info')
+    flash('Logout realizado com sucesso', 'info')
     return redirect(url_for('admin_login'))
 
 @app.route(f'{ADMIN_URL_PREFIX}/planos')
 @login_required
 def admin_planos():
+    """Gerenciamento de planos"""
     try:
         planos = Plano.query.order_by(Plano.ordem_exibicao).all()
         return render_template('admin/planos.html', planos=planos)
     except Exception as e:
-        print(f"❌ Erro admin_planos: {e}")
-        flash('Erro ao carregar planos', 'error')
+        print(f"❌ Erro ao carregar planos admin: {e}")
+        flash('Erro ao carregar os planos', 'error')
         return render_template('admin/planos.html', planos=[])
+
+@app.route(f'{ADMIN_URL_PREFIX}/planos/novo', methods=['GET', 'POST'])
+@login_required
+def admin_novo_plano():
+    """Criar novo plano"""
+    if request.method == 'POST':
+        try:
+            nome = request.form.get('nome', '').strip()
+            preco = request.form.get('preco', '').strip()
+            velocidade = request.form.get('velocidade', '').strip()
+            features = request.form.get('features', '').strip()
+            recomendado = 'recomendado' in request.form
+            ordem_exibicao = int(request.form.get('ordem_exibicao', 0))
+            
+            if not nome or not preco or not features:
+                flash('Preencha todos os campos obrigatórios', 'error')
+                return redirect(url_for('admin_novo_plano'))
+            
+            plano = Plano(
+                nome=nome,
+                preco=preco,
+                velocidade=velocidade,
+                features=features,
+                recomendado=recomendado,
+                ordem_exibicao=ordem_exibicao,
+                ativo=True
+            )
+            
+            db.session.add(plano)
+            db.session.commit()
+            flash('Plano criado com sucesso!', 'success')
+            return redirect(url_for('admin_planos'))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Erro ao criar plano: {e}")
+            flash(f'Erro ao criar plano: {str(e)}', 'error')
+    
+    return render_template('admin/plano_form.html', plano=None)
+
+@app.route(f'{ADMIN_URL_PREFIX}/planos/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def admin_editar_plano(id):
+    """Editar plano existente"""
+    plano = Plano.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            plano.nome = request.form.get('nome', '').strip()
+            plano.preco = request.form.get('preco', '').strip()
+            plano.velocidade = request.form.get('velocidade', '').strip()
+            plano.features = request.form.get('features', '').strip()
+            plano.recomendado = 'recomendado' in request.form
+            plano.ordem_exibicao = int(request.form.get('ordem_exibicao', 0))
+            plano.ativo = 'ativo' in request.form
+            
+            db.session.commit()
+            flash('Plano atualizado com sucesso!', 'success')
+            return redirect(url_for('admin_planos'))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Erro ao atualizar plano: {e}")
+            flash(f'Erro ao atualizar plano: {str(e)}', 'error')
+    
+    return render_template('admin/plano_form.html', plano=plano)
+
+@app.route(f'{ADMIN_URL_PREFIX}/planos/excluir/<int:id>', methods=['POST'])
+@login_required
+def admin_excluir_plano(id):
+    """Excluir plano"""
+    try:
+        plano = Plano.query.get_or_404(id)
+        db.session.delete(plano)
+        db.session.commit()
+        flash('Plano excluído com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erro ao excluir plano: {e}")
+        flash(f'Erro ao excluir plano: {str(e)}', 'error')
+    
+    return redirect(url_for('admin_planos'))
 
 @app.route(f'{ADMIN_URL_PREFIX}/blog')
 @login_required
 def admin_blog():
+    """Gerenciamento do blog"""
     try:
         posts = Post.query.order_by(Post.data_publicacao.desc()).all()
         return render_template('admin/blog.html', posts=posts)
     except Exception as e:
-        print(f"❌ Erro admin_blog: {e}")
-        flash('Erro ao carregar posts', 'error')
+        print(f"❌ Erro ao carregar posts admin: {e}")
+        flash('Erro ao carregar os posts', 'error')
         return render_template('admin/blog.html', posts=[])
+
+@app.route(f'{ADMIN_URL_PREFIX}/blog/novo', methods=['GET', 'POST'])
+@login_required
+def admin_novo_post():
+    """Criar novo post"""
+    if request.method == 'POST':
+        try:
+            titulo = request.form.get('titulo', '').strip()
+            conteudo = request.form.get('conteudo', '').strip()
+            resumo = request.form.get('resumo', '').strip()
+            categoria = request.form.get('categoria', '').strip()
+            link_materia = request.form.get('link_materia', '').strip()
+            data_publicacao_str = request.form.get('data_publicacao', '')
+            imagem = request.files.get('imagem')
+            
+            if not titulo or not conteudo or not resumo or not categoria or not link_materia:
+                flash('Preencha todos os campos obrigatórios', 'error')
+                return redirect(url_for('admin_novo_post'))
+            
+            # Processar data
+            if data_publicacao_str:
+                try:
+                    data_publicacao = datetime.strptime(data_publicacao_str, '%Y-%m-%d')
+                except ValueError:
+                    data_publicacao = datetime.utcnow()
+            else:
+                data_publicacao = datetime.utcnow()
+            
+            # Processar imagem
+            imagem_filename = 'default.jpg'
+            if imagem and imagem.filename:
+                imagem_filename = save_uploaded_file(imagem)
+                if not imagem_filename:
+                    imagem_filename = 'default.jpg'
+            
+            post = Post(
+                titulo=titulo,
+                conteudo=conteudo,
+                resumo=resumo,
+                categoria=categoria,
+                imagem=imagem_filename,
+                link_materia=link_materia,
+                data_publicacao=data_publicacao,
+                ativo=True
+            )
+            
+            db.session.add(post)
+            db.session.commit()
+            flash('Post criado com sucesso!', 'success')
+            return redirect(url_for('admin_blog'))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Erro ao criar post: {e}")
+            flash(f'Erro ao criar post: {str(e)}', 'error')
+    
+    return render_template('admin/post_form.html', post=None)
+
+@app.route(f'{ADMIN_URL_PREFIX}/blog/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def admin_editar_post(id):
+    """Editar post existente"""
+    post = Post.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            post.titulo = request.form.get('titulo', '').strip()
+            post.conteudo = request.form.get('conteudo', '').strip()
+            post.resumo = request.form.get('resumo', '').strip()
+            post.categoria = request.form.get('categoria', '').strip()
+            post.link_materia = request.form.get('link_materia', '').strip()
+            post.ativo = 'ativo' in request.form
+            
+            # Processar data
+            data_publicacao_str = request.form.get('data_publicacao', '')
+            if data_publicacao_str:
+                try:
+                    post.data_publicacao = datetime.strptime(data_publicacao_str, '%Y-%m-%d')
+                except ValueError:
+                    pass
+            
+            # Processar imagem
+            imagem = request.files.get('imagem')
+            if imagem and imagem.filename:
+                imagem_filename = save_uploaded_file(imagem)
+                if imagem_filename:
+                    post.imagem = imagem_filename
+            
+            db.session.commit()
+            flash('Post atualizado com sucesso!', 'success')
+            return redirect(url_for('admin_blog'))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Erro ao atualizar post: {e}")
+            flash(f'Erro ao atualizar post: {str(e)}', 'error')
+    
+    return render_template('admin/post_form.html', post=post)
+
+@app.route(f'{ADMIN_URL_PREFIX}/blog/excluir/<int:id>', methods=['POST'])
+@login_required
+def admin_excluir_post(id):
+    """Excluir post"""
+    try:
+        post = Post.query.get_or_404(id)
+        db.session.delete(post)
+        db.session.commit()
+        flash('Post excluído com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erro ao excluir post: {e}")
+        flash(f'Erro ao excluir post: {str(e)}', 'error')
+    
+    return redirect(url_for('admin_blog'))
 
 @app.route(f'{ADMIN_URL_PREFIX}/configuracoes', methods=['GET', 'POST'])
 @login_required
 def admin_configuracoes():
+    """Gerenciamento de configurações"""
     if request.method == 'POST':
         try:
             for chave, valor in request.form.items():
@@ -388,11 +562,11 @@ def admin_configuracoes():
                         db.session.add(config)
             
             db.session.commit()
-            flash('Configurações salvas!', 'success')
+            flash('Configurações salvas com sucesso!', 'success')
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Erro salvar configurações: {e}")
-            flash(f'Erro: {str(e)}', 'error')
+            print(f"❌ Erro ao salvar configurações: {e}")
+            flash(f'Erro ao salvar configurações: {str(e)}', 'error')
     
     return render_template('admin/configuracoes.html')
 
@@ -426,7 +600,7 @@ def init_database():
                 admin.set_password(admin_password)
                 db.session.add(admin)
                 db.session.commit()
-                print(f"✅ Admin criado: {admin_username}/{admin_password}")
+                print(f"✅ Admin criado: {admin_username}")
             
             # Configurações padrão
             configs_padrao = {
@@ -453,15 +627,25 @@ def init_database():
             print("🎉 Banco inicializado com sucesso!")
             
         except Exception as e:
-            print(f"❌ Erro inicialização banco: {e}")
+            print(f"❌ Erro na inicialização do banco: {e}")
             db.session.rollback()
 
 # ========================================
-# HEALTH CHECK
+# ROTAS DE UTILIDADE
 # ========================================
+
+@app.route('/favicon.ico')
+def favicon():
+    """Favicon do site"""
+    return send_from_directory(
+        os.path.join(app.root_path, 'static'),
+        'favicon.ico',
+        mimetype='image/vnd.microsoft.icon'
+    )
 
 @app.route('/health')
 def health_check():
+    """Endpoint de verificação de saúde da aplicação"""
     try:
         db.session.execute(text('SELECT 1'))
         return jsonify({
@@ -483,14 +667,17 @@ def health_check():
 
 @app.errorhandler(404)
 def not_found_error(error):
+    """Página 404"""
     return render_template('public/404.html'), 404
 
 @app.errorhandler(500)
 def internal_error(error):
+    """Página 500"""
     return render_template('public/500.html'), 500
 
 @app.errorhandler(403)
 def forbidden_error(error):
+    """Página 403"""
     return render_template('public/403.html'), 403
 
 # ========================================
@@ -508,9 +695,11 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
     
-    print(f"🚀 Iniciando NetFyber na porta {port}...")
-    print(f"🔗 URL do Admin: {ADMIN_URL_PREFIX}/login")
-    print(f"👤 Usuário: {ADMIN_USERNAME}")
+    print(f"🚀 Iniciando NetFyber Telecom...")
+    print(f"🌐 URL: http://localhost:{port}")
+    print(f"🔗 Painel Admin: {ADMIN_URL_PREFIX}/login")
+    print(f"👤 Usuário admin: {ADMIN_USERNAME}")
+    print(f"🔧 Modo debug: {debug}")
     
     app.run(
         host='0.0.0.0',

@@ -82,3 +82,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Render
+render.yaml
+*.log

@@ -128,57 +128,6 @@ def reset_database():
             # 6. Posts de blog de exemplo com formatação inteligente
             print("📝 Criando posts do blog...")
             
-            # Importar a função de formatação do app
-            from app import formatar_conteudo_inteligente
-            
-            posts_exemplo = [
-                {
-                    'titulo': 'IA generativa cresce fortemente, mas requer estratégia bem pensada',
-                    'conteudo': 'De acordo com executivos do Itaú e do Banco do Brasil, a inteligência artificial generativa tem grande potencial disruptivo, mas exige investimento significativo e planejamento estratégico — "não basta usar por usar", segundo Marisa Reghini, do BB.\n\n**Muitos bancos preparam uso de "agentes de IA" para automatizar tarefas complexas.**\n<a href="https://www.ibm.com/br-pt/news" target="_blank" rel="noopener noreferrer">IBM Brasil Newsroom</a>\n\n**Apesar do entusiasmo, existe cautela sobre os custos e riscos da adoção.**\n<a href="https://veja.abril.com.br" target="_blank" rel="noopener noreferrer">VEJA</a>',
-                    'resumo': 'IA generativa cresce fortemente, mas requer estratégia bem pensada. De acordo com executivos do Itaú e do Banco do Brasil...',
-                    'categoria': 'tecnologia',
-                    'imagem': 'default.jpg',
-                    'link_materia': 'https://www.valor.com.br/tecnologia/noticia/ia-generativa-cresce-fortemente-mas-requer-estrategia',
-                    'data_publicacao': datetime(2025, 11, 1)
-                },
-                {
-                    'titulo': 'Investimentos em IA no Brasil devem ultrapassar US$ 2,4 bilhões em 2025',
-                    'conteudo': 'Um estudo de projeção aponta que os gastos em IA (infraestrutura, software e serviços) devem alcançar cerca de US$ 2,4 bilhões ainda em 2025. Esse crescimento reflete a prioridade cada vez maior que as empresas brasileiras dão à IA generativa e outras tecnologias associadas.\n<a href="https://www.ianews.com.br" target="_blank" rel="noopener noreferrer">FelipeCFerreira IANews</a>\n\n**A IA não está mais apenas em pilotos: muitas empresas já planejam escalar para usos mais estratégicos.**\n<a href="https://www.xpi.com.br" target="_blank" rel="noopener noreferrer">XP Investimentos</a>\n\n**Parte desse investimento é direcionada a nuvem híbrida e open-source, segundo dados da NTT Data.**\n<a href="https://www.nttdata.com" target="_blank" rel="noopener noreferrer">IT Forum</a>',
-                    'resumo': 'Investimentos em IA no Brasil devem ultrapassar US$ 2,4 bilhões em 2025. Um estudo de projeção aponta que os gastos em IA...',
-                    'categoria': 'tecnologia',
-                    'imagem': 'default.jpg',
-                    'link_materia': 'https://www.ianews.com.br/investimentos-ia-brasil-2025',
-                    'data_publicacao': datetime(2025, 8, 5)
-                },
-                {
-                    'titulo': 'YouTube fecha acordo histórico para transmitir 38 jogos do Brasileirão (2025–2027)',
-                    'conteudo': 'Segundo o jornalista Daniel Castro, o Google comprou os direitos para transmitir 38 jogos por ano do Brasileirão para a plataforma YouTube entre 2025 e 2027, em parceria com a CazéTV.\n<a href="https://www.noticiasdatv.com.br" target="_blank" rel="noopener noreferrer">Notícias da TV</a>\n\n**Os jogos serão os mesmos exibidos pela Record.**\n<a href="https://www.noticiasdatv.com.br" target="_blank" rel="noopener noreferrer">Notícias da TV</a>\n\n**Isso marca uma estratégia agressiva do Google para entrar no mercado de futebol no Brasil.**\n<a href="https://www.noticiasdatv.com.br" target="_blank" rel="noopener noreferrer">Notícias da TV</a>',
-                    'resumo': 'YouTube fecha acordo histórico para transmitir 38 jogos do Brasileirão entre 2025 e 2027, em parceria com a CazéTV...',
-                    'categoria': 'noticias',
-                    'imagem': 'default.jpg',
-                    'link_materia': 'https://www.noticiasdatv.com.br/youtube-brasileirao-2025',
-                    'data_publicacao': datetime(2024, 10, 10)
-                }
-            ]
-            
-            for post_data in posts_exemplo:
-                post = Post(
-                    titulo=post_data['titulo'],
-                    conteudo=post_data['conteudo'],
-                    conteudo_html=formatar_conteudo_inteligente(post_data['conteudo']),
-                    resumo=post_data['resumo'],
-                    categoria=post_data['categoria'],
-                    imagem=post_data['imagem'],
-                    link_materia=post_data['link_materia'],
-                    data_publicacao=post_data['data_publicacao'],
-                    ativo=True,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
-                )
-                db.session.add(post)
-            
-            # Commit final
-            db.session.commit()
             
             print("\n" + "="*60)
             print("✅ RESET CONCLUÍDO COM SUCESSO!")
