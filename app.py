@@ -21,16 +21,31 @@ import html
 
 app = Flask(__name__)
 
+# CORREÇÃO CRÍTICA: Configurar a URL do banco corretamente
+def get_database_url():
+    """Obtém e corrige a URL do banco de dados"""
+    database_url = os.environ.get('DATABASE_URL')
+    
+    if database_url:
+        # CORREÇÃO: Converter postgres:// para postgresql://
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        return database_url
+    
+    # Fallback para desenvolvimento
+    return 'sqlite:///netfyber.db'
+
+# Configurações
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
-DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres:102030@localhost/testenet1')
+DATABASE_URL = get_database_url()  # USAR FUNÇÃO CORRIGIDA
 ADMIN_URL_PREFIX = os.environ.get('ADMIN_URL_PREFIX', '/gestao-exclusiva-netfyber')
 ADMIN_IPS = os.environ.get('ADMIN_IPS', '127.0.0.1,::1').split(',')
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'netfyber_admin')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@netfyber.com')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Admin@Netfyber2025!')
 
-
 app.config['SECRET_KEY'] = SECRET_KEY
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL  # USAR VARIÁVEL CORRIGIDA
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 app.config['UPLOAD_FOLDER'] = 'static/uploads/blog'
@@ -45,17 +60,18 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 if 'RENDER' in os.environ:
     print("🚀 Ambiente Render detectado")
     
-    # Forçar algumas configurações no Render
+    # Configurações de pool de conexão para Render
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'pool_recycle': 300,
         'pool_pre_ping': True,
+        'pool_size': 10,
+        'max_overflow': 20,
     }
     
     # Ajustar ADMIN_IPS para incluir IPs do Render
-    if ADMIN_IPS and isinstance(ADMIN_IPS, str):
-        ADMIN_IPS = f"{ADMIN_IPS},0.0.0.0,127.0.0.1,::1"
-    else:
-        ADMIN_IPS = "0.0.0.0,127.0.0.1,::1"
+    ADMIN_IPS.append('0.0.0.0')
+    ADMIN_IPS.append('127.0.0.1')
+    ADMIN_IPS.append('::1')
 
 db = SQLAlchemy(app)
 
@@ -64,140 +80,25 @@ db = SQLAlchemy(app)
 # ========================================
 
 def formatar_conteudo_inteligente(conteudo):
-    """
-    Formata conteúdo de forma simples e eficiente:
-    1. **negrito** → <strong>negrito</strong>
-    2. Quebras de linha → <br>
-    3. Links HTML são mantidos com segurança
-    4. Listas com - → <ul><li>
-    
-    Esta função é ALINHADA com o JavaScript do front-end
-    """
+    """Formata conteúdo de forma simples e eficiente"""
     if not conteudo:
         return ""
     
-    # 1. Processar listas primeiro (manter estrutura)
-    lines = conteudo.strip().split('\n')
-    result_lines = []
-    in_list = False
+    # 1. Processar negrito
+    conteudo = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', conteudo)
     
-    for line in lines:
-        line = line.rstrip()
-        
-        # Verificar se é item de lista
-        if line.startswith('- ') or line.startswith('* '):
-            if not in_list:
-                result_lines.append('<ul>')
-                in_list = True
-            
-            item_content = line[2:].strip()
-            # Processar negrito dentro do item da lista
-            item_content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', item_content)
-            result_lines.append(f'<li>{item_content}</li>')
-        else:
-            if in_list:
-                result_lines.append('</ul>')
-                in_list = False
-            
-            if line:
-                # Processar títulos ##
-                if line.startswith('## '):
-                    title = line[3:].strip()
-                    result_lines.append(f'<h4>{title}</h4>')
-                else:
-                    # Processar negrito no texto normal
-                    line = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', line)
-                    # Manter quebras de linha originais
-                    result_lines.append(line)
-            else:
-                # Linha vazia → quebra de parágrafo
-                result_lines.append('<br>')
+    # 2. Converter quebras de linha para <br>
+    conteudo = conteudo.replace('\n', '<br>')
     
-    # Fechar lista se ainda aberta
-    if in_list:
-        result_lines.append('</ul>')
+    # 3. Processar links simples
+    def make_links(match):
+        url = match.group(0)
+        return f'<a href="{url}" target="_blank" rel="noopener noreferrer">{url}</a>'
     
-    # Juntar tudo mantendo estrutura
-    html_content = '\n'.join(result_lines)
+    url_pattern = r'https?://[^\s<>"]+'
+    conteudo = re.sub(url_pattern, make_links, conteudo)
     
-    # 2. Converter quebras de linha restantes para <br>
-    # Mas NÃO converter dentro de listas
-    def process_paragraphs(text):
-        paragraphs = text.split('\n')
-        result = []
-        
-        for para in paragraphs:
-            if para.startswith('<ul>') or para.startswith('<li>') or para.startswith('</ul>') or para.startswith('<h4>') or para.startswith('</h4>'):
-                result.append(para)
-            elif para == '<br>':
-                result.append(para)
-            elif para:
-                result.append(f'{para}<br>')
-            else:
-                result.append('<br>')
-        
-        return ''.join(result)
-    
-    html_content = process_paragraphs(html_content)
-    
-    # 3. Processar links HTML com segurança
-    def add_link_attributes(attrs, new=False):
-        href_key = (None, 'href')
-        if href_key in attrs:
-            href = attrs[href_key]
-            if href.startswith(('http://', 'https://')):
-                rel_parts = []
-                if (None, 'rel') in attrs:
-                    rel_parts = attrs[(None, 'rel')].split()
-                
-                if 'noopener' not in rel_parts:
-                    rel_parts.append('noopener')
-                if 'noreferrer' not in rel_parts:
-                    rel_parts.append('noreferrer')
-                
-                attrs[(None, 'rel')] = ' '.join(rel_parts)
-                attrs[(None, 'target')] = '_blank'
-        
-        return attrs
-    
-    # 4. Sanitizar HTML permitindo tags seguras
-    allowed_tags = ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li', 
-                   'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div']
-    
-    allowed_attributes = {
-        'a': ['href', 'title', 'target', 'rel', 'class'],
-        '*': ['class']
-    }
-    
-    # Primeiro linkify para processar URLs
-    linker = Linker(callbacks=[add_link_attributes])
-    html_content = linker.linkify(html_content)
-    
-    # Depois sanitizar
-    conteudo_sanitizado = bleach.clean(
-        html_content,
-        tags=allowed_tags,
-        attributes=allowed_attributes,
-        strip=True,
-        strip_comments=True
-    )
-    
-    # 5. Corrigir múltiplos <br> consecutivos
-    conteudo_sanitizado = re.sub(r'(<br>\s*){3,}', '<br><br>', conteudo_sanitizado)
-    
-    # 6. Remover <br> dentro de listas (se ainda houver)
-    def clean_br_in_lists(match):
-        content = match.group(0)
-        # Remover <br> entre itens de lista
-        content = re.sub(r'</li>\s*<br>\s*<li>', '</li><li>', content)
-        # Remover <br> no início/fim dos itens
-        content = re.sub(r'<li>\s*<br>\s*', '<li>', content)
-        content = re.sub(r'\s*<br>\s*</li>', '</li>', content)
-        return content
-    
-    conteudo_sanitizado = re.sub(r'<ul>.*?</ul>', clean_br_in_lists, conteudo_sanitizado, flags=re.DOTALL)
-    
-    return conteudo_sanitizado
+    return conteudo
 
 # ========================================
 # SEGURANÇA
@@ -291,7 +192,7 @@ class Plano(db.Model):
     def get_features_list(self):
         if not self.features:
             return []
-        return [bleach.clean(f.strip()) for f in self.features.split('\n') if f.strip()]
+        return [f.strip() for f in self.features.split('\n') if f.strip()]
 
 class Configuracao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -300,16 +201,10 @@ class Configuracao(db.Model):
     descricao = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    @staticmethod
-    def get_valor(chave, default=None):
-        config = Configuracao.query.filter_by(chave=chave).first()
-        return bleach.clean(config.valor) if config else default
-
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     titulo = db.Column(db.String(200), nullable=False)
     conteudo = db.Column(db.Text, nullable=False)
-    conteudo_html = db.Column(db.Text)  # HTML formatado
     resumo = db.Column(db.Text, nullable=False)
     categoria = db.Column(db.String(50), nullable=False)
     imagem = db.Column(db.String(200), default='default.jpg')
@@ -318,14 +213,6 @@ class Post(db.Model):
     ativo = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    def get_conteudo_html(self):
-        if self.conteudo_html and self.conteudo_html.strip():
-            return self.conteudo_html
-        
-        self.conteudo_html = formatar_conteudo_inteligente(self.conteudo)
-        db.session.commit()
-        return self.conteudo_html
 
     def get_data_formatada(self):
         try:
@@ -346,31 +233,43 @@ def load_user(user_id):
     return AdminUser.query.get(int(user_id))
 
 # ========================================
+# CORREÇÃO DO ERRO NA LINHA 433
+# ========================================
+
+def get_configs_safe():
+    """Obtém configurações de forma segura, mesmo se o banco falhar"""
+    try:
+        configs = {}
+        for config in Configuracao.query.all():
+            configs[config.chave] = config.valor
+        return configs
+    except Exception as e:
+        print(f"⚠️ Erro ao buscar configurações: {e}")
+        # Retorna configurações padrão se o banco falhar
+        return {
+            'telefone_contato': '(63) 8494-1778',
+            'email_contato': 'contato@netfyber.com',
+            'endereco': 'AV. Tocantins – 934, Centro – Sítio Novo – TO',
+            'hero_titulo': 'Internet de Alta Velocidade',
+            'hero_subtitulo': 'Conecte sua família ao futuro com a NetFyber Telecom'
+        }
+
+# ========================================
 # MIDDLEWARE DE SEGURANÇA
 # ========================================
 
 @app.before_request
 def restrict_admin_access():
-    """Middleware de segurança para rotas administrativas - Adaptado para Render"""
     if request.path.startswith(ADMIN_URL_PREFIX):
         client_ip = request.remote_addr
         x_forwarded_for = request.headers.get('X-Forwarded-For')
         
-        # No Render, pegar IP real dos headers
         if x_forwarded_for:
             client_ip = x_forwarded_for.split(',')[0].strip()
         
-        # Converter ADMIN_IPS para lista
-        allowed_ips = ADMIN_IPS.split(',') if isinstance(ADMIN_IPS, str) else ADMIN_IPS
-        
-        # Adicionar IPs internos do Render para permitir acesso
-        render_ips = ['0.0.0.0', '127.0.0.1', '::1', 'localhost']
-        allowed_ips.extend(render_ips)
+        allowed_ips = ADMIN_IPS if isinstance(ADMIN_IPS, list) else ADMIN_IPS.split(',')
         
         if client_ip not in allowed_ips:
-            print(f"⚠️ Tentativa de acesso não autorizado de IP: {client_ip}")
-            print(f"📡 IPs permitidos: {allowed_ips}")
-            print(f"🌐 X-Forwarded-For: {x_forwarded_for}")
             abort(403, description="Acesso não autorizado. IP não permitido.")
 
 # ========================================
@@ -404,34 +303,13 @@ def save_uploaded_file(file):
     
     return None
 
-def delete_uploaded_file(filename):
-    if not filename or filename == 'default.jpg':
-        return False
-    
-    try:
-        safe_filename = secure_filename(filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], safe_filename)
-        
-        if not os.path.abspath(file_path).startswith(os.path.abspath(app.config['UPLOAD_FOLDER'])):
-            return False
-            
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            return True
-    except Exception as e:
-        print(f"Erro ao deletar arquivo {filename}: {e}")
-    
-    return False
-
 # ========================================
-# ROTAS PÚBLICAS
+# ROTAS PÚBLICAS (CORRIGIDAS)
 # ========================================
 
 @app.route('/')
 def index():
-    configs = {}
-    for config in Configuracao.query.all():
-        configs[config.chave] = config.valor
+    configs = get_configs_safe()  # USAR FUNÇÃO SEGURA
     return render_template('public/index.html', configs=configs)
 
 @app.route('/planos')
@@ -441,43 +319,35 @@ def planos():
         planos_formatados = []
         for plano in planos_data:
             planos_formatados.append({
-                'nome': bleach.clean(plano.nome),
-                'preco': bleach.clean(plano.preco),
-                'features': [bleach.clean(f) for f in plano.get_features_list()],
+                'nome': plano.nome,
+                'preco': plano.preco,
+                'features': plano.get_features_list(),
                 'recomendado': plano.recomendado
             })
-        configs = {}
-        for config in Configuracao.query.all():
-            configs[config.chave] = config.valor
+        configs = get_configs_safe()  # USAR FUNÇÃO SEGURA
         return render_template('public/planos.html', planos=planos_formatados, configs=configs)
     except Exception as e:
         print(f"Erro na rota /planos: {e}")
-        return render_template('public/planos.html', planos=[], configs={})
+        return render_template('public/planos.html', planos=[], configs=get_configs_safe())
 
 @app.route('/blog')
 def blog():
     try:
         posts = Post.query.filter_by(ativo=True).order_by(Post.data_publicacao.desc()).all()
-        configs = {}
-        for config in Configuracao.query.all():
-            configs[config.chave] = config.valor
+        configs = get_configs_safe()  # USAR FUNÇÃO SEGURA
         return render_template('public/blog.html', configs=configs, posts=posts)
     except Exception as e:
         print(f"Erro na rota /blog: {e}")
-        return render_template('public/blog.html', configs={}, posts=[])
+        return render_template('public/blog.html', configs=get_configs_safe(), posts=[])
 
 @app.route('/velocimetro')
 def velocimetro():
-    configs = {}
-    for config in Configuracao.query.all():
-        configs[config.chave] = config.valor
+    configs = get_configs_safe()  # USAR FUNÇÃO SEGURA
     return render_template('public/velocimetro.html', configs=configs)
 
 @app.route('/sobre')
 def sobre():
-    configs = {}
-    for config in Configuracao.query.all():
-        configs[config.chave] = config.valor
+    configs = get_configs_safe()  # USAR FUNÇÃO SEGURA
     return render_template('public/sobre.html', configs=configs)
 
 # ========================================
@@ -504,7 +374,6 @@ def admin_login():
                 if user.check_password(password):
                     login_user(user, remember=False)
                     flash('Login realizado com sucesso!', 'success')
-                    print(f"Login bem-sucedido para usuário: {username}")
                     
                     next_page = request.args.get('next')
                     if next_page:
@@ -515,7 +384,6 @@ def admin_login():
             except ValueError as e:
                 flash(str(e), 'error')
         else:
-            check_password_hash(generate_password_hash('dummy'), 'dummy_password')
             flash('Usuário ou senha inválidos.', 'error')
     
     return render_template('auth/login.html')
@@ -523,7 +391,6 @@ def admin_login():
 @app.route(f'{ADMIN_URL_PREFIX}/logout')
 @login_required
 def admin_logout():
-    print(f"Logout do usuário: {current_user.username}")
     logout_user()
     flash('Você saiu da sua conta.', 'info')
     return redirect(url_for('admin_login'))
@@ -535,8 +402,12 @@ def admin_logout():
 @app.route(f'{ADMIN_URL_PREFIX}/blog')
 @login_required
 def admin_blog():
-    posts = Post.query.filter_by(ativo=True).order_by(Post.data_publicacao.desc()).all()
-    return render_template('admin/blog.html', posts=posts)
+    try:
+        posts = Post.query.filter_by(ativo=True).order_by(Post.data_publicacao.desc()).all()
+        return render_template('admin/blog.html', posts=posts)
+    except Exception as e:
+        flash('Erro ao carregar posts.', 'error')
+        return render_template('admin/blog.html', posts=[])
 
 @app.route(f'{ADMIN_URL_PREFIX}/blog/adicionar', methods=['GET', 'POST'])
 @login_required
@@ -547,7 +418,6 @@ def adicionar_post():
             conteudo = request.form.get('conteudo', '').strip()
             categoria = bleach.clean(request.form.get('categoria', ''))
             link_materia = request.form.get('link_materia', '').strip()
-            data_publicacao_str = request.form.get('data_publicacao', '')
             
             if not all([titulo, conteudo, categoria, link_materia]):
                 flash('Todos os campos obrigatórios devem ser preenchidos.', 'error')
@@ -564,36 +434,21 @@ def adicionar_post():
                     uploaded_filename = save_uploaded_file(file)
                     if uploaded_filename:
                         imagem_filename = uploaded_filename
-                    else:
-                        flash('Arquivo de imagem inválido.', 'error')
-                        return redirect(request.url)
             
-            try:
-                data_publicacao = datetime.strptime(data_publicacao_str, '%d/%m/%Y')
-            except ValueError:
-                data_publicacao = datetime.utcnow()
-                flash('Data inválida. Usando data atual.', 'warning')
-            
-            resumo = bleach.clean(conteudo[:150] + '...' if len(conteudo) > 150 else conteudo)
-            
-            # Processar conteúdo com formatação inteligente
-            conteudo_html = formatar_conteudo_inteligente(conteudo)
+            resumo = conteudo[:150] + '...' if len(conteudo) > 150 else conteudo
             
             novo_post = Post(
                 titulo=titulo,
                 conteudo=conteudo,
-                conteudo_html=conteudo_html,
                 resumo=resumo,
                 categoria=categoria,
                 imagem=imagem_filename,
-                link_materia=link_materia,
-                data_publicacao=data_publicacao
+                link_materia=link_materia
             )
             
             db.session.add(novo_post)
             db.session.commit()
             
-            print(f"Novo post criado por {current_user.username}: {titulo}")
             flash(f'Post "{novo_post.titulo}" adicionado com sucesso!', 'success')
             return redirect(url_for('admin_blog'))
             
@@ -617,27 +472,13 @@ def editar_post(post_id):
                 if file and file.filename != '':
                     uploaded_filename = save_uploaded_file(file)
                     if uploaded_filename:
-                        if post.imagem and post.imagem != 'default.jpg':
-                            delete_uploaded_file(post.imagem)
                         post.imagem = uploaded_filename
             
-            data_publicacao_str = request.form.get('data_publicacao', '')
-            try:
-                data_publicacao = datetime.strptime(data_publicacao_str, '%d/%m/%Y')
-            except ValueError:
-                data_publicacao = post.data_publicacao
-                flash('Data inválida. Mantendo data original.', 'warning')
-            
-            conteudo = request.form.get('conteudo', '').strip()
-            resumo = conteudo[:150] + '...' if len(conteudo) > 150 else conteudo
-            
             post.titulo = bleach.clean(request.form.get('titulo', '').strip())
-            post.conteudo = conteudo
-            post.conteudo_html = formatar_conteudo_inteligente(conteudo)
-            post.resumo = resumo
+            post.conteudo = request.form.get('conteudo', '').strip()
+            post.resumo = post.conteudo[:150] + '...' if len(post.conteudo) > 150 else post.conteudo
             post.categoria = bleach.clean(request.form.get('categoria', ''))
             post.link_materia = request.form.get('link_materia', '').strip()
-            post.data_publicacao = data_publicacao
             post.updated_at = datetime.utcnow()
             
             db.session.commit()
@@ -656,9 +497,6 @@ def editar_post(post_id):
 def excluir_post(post_id):
     try:
         post = Post.query.get_or_404(post_id)
-        if post.imagem and post.imagem != 'default.jpg':
-            delete_uploaded_file(post.imagem)
-        
         post.ativo = False
         db.session.commit()
         flash(f'Post "{post.titulo}" excluído com sucesso!', 'success')
@@ -676,8 +514,12 @@ def excluir_post(post_id):
 @app.route(f'{ADMIN_URL_PREFIX}/planos')
 @login_required
 def admin_planos():
-    planos_data = Plano.query.filter_by(ativo=True).order_by(Plano.ordem_exibicao).all()
-    return render_template('admin/planos.html', planos=planos_data)
+    try:
+        planos_data = Plano.query.filter_by(ativo=True).order_by(Plano.ordem_exibicao).all()
+        return render_template('admin/planos.html', planos=planos_data)
+    except Exception as e:
+        flash('Erro ao carregar planos.', 'error')
+        return render_template('admin/planos.html', planos=[])
 
 @app.route(f'{ADMIN_URL_PREFIX}/planos/adicionar', methods=['GET', 'POST'])
 @login_required
@@ -761,8 +603,12 @@ def admin_configuracoes():
             flash('Erro ao atualizar configurações.', 'error')
     
     configs = {}
-    for config in Configuracao.query.all():
-        configs[config.chave] = config.valor
+    try:
+        for config in Configuracao.query.all():
+            configs[config.chave] = config.valor
+    except Exception as e:
+        print(f"Erro ao carregar configurações: {e}")
+    
     return render_template('admin/configuracoes.html', configs=configs)
 
 # ========================================
@@ -771,18 +617,21 @@ def admin_configuracoes():
 
 @app.route('/api/planos')
 def api_planos():
-    planos_data = Plano.query.filter_by(ativo=True).order_by(Plano.ordem_exibicao).all()
-    planos_list = []
-    for plano in planos_data:
-        planos_list.append({
-            'id': plano.id,
-            'nome': plano.nome,
-            'preco': plano.preco,
-            'velocidade': plano.velocidade,
-            'features': plano.get_features_list(),
-            'recomendado': plano.recomendado
-        })
-    return jsonify(planos_list)
+    try:
+        planos_data = Plano.query.filter_by(ativo=True).order_by(Plano.ordem_exibicao).all()
+        planos_list = []
+        for plano in planos_data:
+            planos_list.append({
+                'id': plano.id,
+                'nome': plano.nome,
+                'preco': plano.preco,
+                'velocidade': plano.velocidade,
+                'features': plano.get_features_list(),
+                'recomendado': plano.recomendado
+            })
+        return jsonify(planos_list)
+    except Exception as e:
+        return jsonify([])
 
 @app.route('/api/blog/posts')
 def api_blog_posts():
@@ -798,11 +647,9 @@ def api_blog_posts():
                 'imagem': post.get_imagem_url(),
                 'link_materia': post.link_materia,
                 'data_publicacao': post.get_data_formatada(),
-                'conteudo': post.get_conteudo_html()
             })
         return jsonify(posts_list)
     except Exception as e:
-        print(f"Erro na API /api/blog/posts: {e}")
         return jsonify([])
 
 @app.route('/health')
@@ -823,62 +670,18 @@ def pagina_nao_encontrada(error):
 
 @app.errorhandler(403)
 def acesso_negado(error):
-    print(f"Acesso negado: {request.remote_addr} - {request.path}")
     return render_template('public/403.html'), 403
 
 @app.errorhandler(500)
 def erro_servidor(error):
-    print(f"Erro interno do servidor: {error}")
     return render_template('public/500.html'), 500
 
 # ========================================
 # INICIALIZAÇÃO DO BANCO DE DADOS
 # ========================================
 
-def create_database():
-    """Função para criar banco de dados se não existir (para Render)"""
-    database_url = os.environ.get('DATABASE_URL')
-    
-    if database_url and 'RENDER' in os.environ:
-        try:
-            # Extrair informações da URL
-            parsed_url = urlparse(database_url)
-            
-            # Usar psycopg2 (que é o que está instalado)
-            import psycopg2
-            from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-            
-            # Conectar ao PostgreSQL server
-            conn = psycopg2.connect(
-                database='postgres',
-                user=parsed_url.username,
-                password=parsed_url.password,
-                host=parsed_url.hostname,
-                port=parsed_url.port
-            )
-            conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-            cur = conn.cursor()
-            
-            # Criar banco de dados se não existir
-            db_name = parsed_url.path[1:]  # Remove a barra inicial
-            cur.execute(f"SELECT 1 FROM pg_database WHERE datname='{db_name}'")
-            exists = cur.fetchone()
-            
-            if not exists:
-                cur.execute(f'CREATE DATABASE {db_name}')
-                print(f"✅ Banco de dados '{db_name}' criado")
-            else:
-                print(f"✅ Banco de dados '{db_name}' já existe")
-            
-            cur.close()
-            conn.close()
-            
-        except Exception as e:
-            print(f"⚠️ Não foi possível criar banco de dados: {e}")
-            print("🔧 Usando banco existente ou configurado...")
-
-def create_tables():
-    """Cria as tabelas e dados iniciais"""
+def init_database():
+    """Inicializa o banco de dados"""
     with app.app_context():
         try:
             # Criar tabelas
@@ -902,7 +705,7 @@ def create_tables():
             configs_padrao = {
                 'telefone_contato': '(63) 8494-1778',
                 'email_contato': 'contato@netfyber.com',
-                'endereco': 'AV. Tocantins – 934, Centro – Sítio Novo – TO<br>Axixá TO / Juverlândia / São Pedro / Folha Seca / Morada Nova / Santa Luzia / Boa Esperança',
+                'endereco': 'AV. Tocantins – 934, Centro – Sítio Novo – TO',
                 'horario_segunda_sexta': '08h às 18h',
                 'horario_sabado': '08h às 13h',
                 'whatsapp_numero': '556384941778',
@@ -918,45 +721,20 @@ def create_tables():
                     config = Configuracao(chave=chave, valor=valor)
                     db.session.add(config)
             
-            # Dados de exemplo para posts
-            if Post.query.count() == 0:
-                posts_exemplo = [
-                    Post(
-                        titulo='IA generativa cresce fortemente, mas requer estratégia bem pensada',
-                        conteudo='De acordo com executivos do Itaú e do Banco do Brasil, a inteligência artificial generativa tem grande potencial disruptivo, mas exige investimento significativo e planejamento estratégico — "não basta usar por usar", segundo Marisa Reghini, do BB.\n\n**Muitos bancos preparam uso de "agentes de IA" para automatizar tarefas complexas.**\n<a href="https://www.ibm.com/br-pt/news" target="_blank">IBM Brasil Newsroom</a>\n\n**Apesar do entusiasmo, existe cautela sobre os custos e riscos da adoção.**\n<a href="https://veja.abril.com.br" target="_blank">VEJA</a>',
-                        resumo='IA generativa cresce fortemente, mas requer estratégia bem pensada. De acordo com executivos do Itaú e do Banco do Brasil...',
-                        categoria='tecnologia',
-                        imagem='default.jpg',
-                        link_materia='https://www.valor.com.br/tecnologia/noticia/ia-generativa-cresce-fortemente-mas-requer-estrategia',
-                        data_publicacao=datetime(2025, 11, 1)
-                    )
-                ]
-                
-                for post in posts_exemplo:
-                    post.conteudo_html = formatar_conteudo_inteligente(post.conteudo)
-                    db.session.add(post)
-                
-                print("📝 Posts de exemplo adicionados com sucesso!")
-            
-            # Commit final
             db.session.commit()
             print("✅ Banco de dados inicializado com sucesso!")
             
         except Exception as e:
             print(f"❌ Erro ao inicializar banco de dados: {e}")
-            db.session.rollback()
+            print(f"🔍 URL do banco: {app.config['SQLALCHEMY_DATABASE_URI'][:50]}...")
 
 # ========================================
 # EXECUÇÃO PRINCIPAL
 # ========================================
 
 if __name__ == '__main__':
-    # Tentar criar banco se estiver no Render
-    if 'RENDER' in os.environ:
-        create_database()
-    
-    # Criar tabelas e dados iniciais
-    create_tables()
+    # Inicializar banco de dados
+    init_database()
     
     # Configurações de porta
     port = int(os.environ.get('PORT', 5000))

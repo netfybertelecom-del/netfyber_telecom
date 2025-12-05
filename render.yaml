@@ -2,37 +2,16 @@ services:
   - type: web
     name: netfyber
     env: python
-    plan: free
-    region: oregon
-    branch: main
-    buildCommand: chmod +x build.sh && ./build.sh
-    startCommand: gunicorn app:app
+    buildCommand: |
+      pip install -r requirements.txt
+    startCommand: |
+      gunicorn app:app
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: netfyber-db
+          property: connectionString
       - key: FLASK_ENV
         value: production
       - key: SECRET_KEY
         generateValue: true
-      - key: DATABASE_URL
-        fromDatabase:
-          name: netfyber_db
-          property: connectionString
-      - key: ADMIN_URL_PREFIX
-        value: /gestao-exclusiva-netfyber
-      - key: ADMIN_IPS
-        value: 0.0.0.0,127.0.0.1,::1
-      - key: ADMIN_USERNAME
-        value: netfyber_admin
-      - key: ADMIN_PASSWORD
-        value: Ny7@F8b#2qP9!vM0xW3c$K5
-      - key: ADMIN_EMAIL
-        value: admin@netfyber.com
-      - key: PYTHON_VERSION
-        value: 3.12.10
-      - key: PORT
-        value: 10000
-
-databases:
-  - name: netfyber_db
-    plan: free
-    databaseName: netfyber
-    user: netfyber_user
