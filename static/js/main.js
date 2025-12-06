@@ -1,237 +1,5 @@
 // ========================================
-// CARROSSEL DE PLANOS - PROFISSIONAL E RESPONSIVO
-// ========================================
-
-class PlanosCarousel {
-    constructor(containerSelector = '.carrossel-planos-container') {
-        this.container = document.querySelector(containerSelector);
-        if (!this.container) return;
-        
-        this.track = this.container.querySelector('.carrossel-track');
-        this.items = Array.from(this.track.children);
-        this.prevBtn = this.container.querySelector('.carrossel-anterior');
-        this.nextBtn = this.container.querySelector('.carrossel-proximo');
-        this.indicatorsContainer = this.container.querySelector('.carrossel-indicadores');
-        this.indicators = [];
-        
-        this.currentIndex = 0;
-        this.slidesPerView = this.getSlidesPerView();
-        this.totalSlides = this.items.length;
-        this.isAnimating = false;
-        this.autoPlayInterval = null;
-        this.touchStartX = 0;
-        this.touchEndX = 0;
-        this.minSwipeDistance = 50;
-        
-        this.init();
-    }
-    
-    init() {
-        if (this.totalSlides === 0) return;
-        
-        this.setupIndicators();
-        this.setupEventListeners();
-        this.updateCarousel();
-        this.startAutoPlay();
-        
-        // Inicializar swipe
-        this.track.addEventListener('touchstart', this.handleTouchStart.bind(this));
-        this.track.addEventListener('touchend', this.handleTouchEnd.bind(this));
-        
-        console.log('🎯 Carrossel inicializado com', this.totalSlides, 'slides');
-    }
-    
-    getSlidesPerView() {
-        const width = window.innerWidth;
-        if (width >= 992) return 3;  // Desktop
-        if (width >= 768) return 2;  // Tablet
-        return 1;                    // Mobile
-    }
-    
-    setupIndicators() {
-        if (!this.indicatorsContainer) return;
-        
-        this.indicatorsContainer.innerHTML = '';
-        const indicatorCount = Math.ceil(this.totalSlides / this.slidesPerView);
-        
-        for (let i = 0; i < indicatorCount; i++) {
-            const indicator = document.createElement('button');
-            indicator.className = 'carrossel-indicador';
-            indicator.setAttribute('aria-label', `Ir para slide ${i + 1}`);
-            indicator.addEventListener('click', () => this.goToSlide(i));
-            
-            this.indicatorsContainer.appendChild(indicator);
-            this.indicators.push(indicator);
-        }
-        
-        this.updateIndicators();
-    }
-    
-    setupEventListeners() {
-        // Botões de navegação
-        if (this.prevBtn) {
-            this.prevBtn.addEventListener('click', () => this.prev());
-        }
-        
-        if (this.nextBtn) {
-            this.nextBtn.addEventListener('click', () => this.next());
-        }
-        
-        // Navegação por teclado
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                this.prev();
-            }
-            if (e.key === 'ArrowRight') {
-                e.preventDefault();
-                this.next();
-            }
-        });
-        
-        // Redimensionamento da janela
-        window.addEventListener('resize', this.handleResize.bind(this));
-        
-        // Pausar autoplay no hover
-        this.container.addEventListener('mouseenter', () => this.pauseAutoPlay());
-        this.container.addEventListener('mouseleave', () => this.startAutoPlay());
-    }
-    
-    handleResize() {
-        const newSlidesPerView = this.getSlidesPerView();
-        
-        if (newSlidesPerView !== this.slidesPerView) {
-            this.slidesPerView = newSlidesPerView;
-            this.setupIndicators();
-            this.updateCarousel();
-        }
-    }
-    
-    updateCarousel() {
-        const itemWidth = 100 / this.slidesPerView;
-        const translateX = -this.currentIndex * itemWidth;
-        
-        this.track.style.transform = `translateX(${translateX}%)`;
-        this.updateButtons();
-        this.updateIndicators();
-    }
-    
-    updateButtons() {
-        const maxIndex = Math.max(0, this.totalSlides - this.slidesPerView);
-        
-        if (this.prevBtn) {
-            this.prevBtn.disabled = this.currentIndex === 0;
-        }
-        
-        if (this.nextBtn) {
-            this.nextBtn.disabled = this.currentIndex >= maxIndex;
-        }
-    }
-    
-    updateIndicators() {
-        const activeIndicator = Math.floor(this.currentIndex / this.slidesPerView);
-        
-        this.indicators.forEach((indicator, index) => {
-            indicator.classList.toggle('active', index === activeIndicator);
-        });
-    }
-    
-    next() {
-        if (this.isAnimating) return;
-        
-        const maxIndex = Math.max(0, this.totalSlides - this.slidesPerView);
-        
-        if (this.currentIndex < maxIndex) {
-            this.currentIndex++;
-        } else {
-            this.currentIndex = 0;
-        }
-        
-        this.animateTransition();
-    }
-    
-    prev() {
-        if (this.isAnimating) return;
-        
-        if (this.currentIndex > 0) {
-            this.currentIndex--;
-        } else {
-            const maxIndex = Math.max(0, this.totalSlides - this.slidesPerView);
-            this.currentIndex = maxIndex;
-        }
-        
-        this.animateTransition();
-    }
-    
-    goToSlide(slideIndex) {
-        if (this.isAnimating || slideIndex < 0 || slideIndex >= this.indicators.length) return;
-        
-        this.currentIndex = slideIndex * this.slidesPerView;
-        this.animateTransition();
-    }
-    
-    animateTransition() {
-        this.isAnimating = true;
-        this.track.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-        
-        setTimeout(() => {
-            this.isAnimating = false;
-            this.track.style.transition = '';
-        }, 500);
-        
-        this.updateCarousel();
-        this.restartAutoPlay();
-    }
-    
-    handleTouchStart(e) {
-        this.touchStartX = e.changedTouches[0].screenX;
-    }
-    
-    handleTouchEnd(e) {
-        this.touchEndX = e.changedTouches[0].screenX;
-        const swipeDistance = this.touchStartX - this.touchEndX;
-        
-        if (Math.abs(swipeDistance) > this.minSwipeDistance) {
-            if (swipeDistance > 0) {
-                this.next();
-            } else {
-                this.prev();
-            }
-        }
-    }
-    
-    startAutoPlay() {
-        if (this.totalSlides > this.slidesPerView && !this.autoPlayInterval) {
-            this.autoPlayInterval = setInterval(() => {
-                this.next();
-            }, 5000);
-        }
-    }
-    
-    pauseAutoPlay() {
-        if (this.autoPlayInterval) {
-            clearInterval(this.autoPlayInterval);
-            this.autoPlayInterval = null;
-        }
-    }
-    
-    restartAutoPlay() {
-        this.pauseAutoPlay();
-        this.startAutoPlay();
-    }
-    
-    destroy() {
-        this.pauseAutoPlay();
-        // Remover event listeners
-        if (this.prevBtn) this.prevBtn.removeEventListener('click', () => this.prev());
-        if (this.nextBtn) this.nextBtn.removeEventListener('click', () => this.next());
-        document.removeEventListener('keydown', this.handleKeydown);
-        window.removeEventListener('resize', this.handleResize);
-    }
-}
-
-// ========================================
-// SISTEMA DE COOKIES
+// SISTEMA DE COOKIES PROFISSIONAL
 // ========================================
 
 class CookieManager {
@@ -240,23 +8,26 @@ class CookieManager {
         this.cookieExpiry = 365;
         this.init();
     }
-    
+
     init() {
         const preferences = this.getCookiePreferences();
         if (!preferences) {
-            setTimeout(() => this.showBanner(), 1000);
+            setTimeout(() => this.showBanner(), 1500);
+        } else {
+            this.applyPreferences(preferences);
         }
     }
-    
+
     getCookiePreferences() {
         try {
             const cookie = localStorage.getItem(this.cookieName);
             return cookie ? JSON.parse(cookie) : null;
-        } catch {
+        } catch (error) {
+            console.warn('Erro ao ler preferências de cookies:', error);
             return null;
         }
     }
-    
+
     saveCookiePreferences(preferences) {
         try {
             const cookieData = {
@@ -266,32 +37,112 @@ class CookieManager {
             };
             
             localStorage.setItem(this.cookieName, JSON.stringify(cookieData));
+            this.applyPreferences(preferences);
             this.hideBanner();
-            this.showNotification('Preferências de cookies salvas!', 'success');
-        } catch {
-            this.showNotification('Erro ao salvar preferências', 'danger');
+            this.showConfirmation(preferences);
+            
+        } catch (error) {
+            console.error('Erro ao salvar preferências:', error);
+            this.showNotification('Erro ao salvar preferências. Tente novamente.', 'danger');
         }
     }
-    
+
     showBanner() {
         const banner = document.getElementById('cookie-banner');
         if (banner) {
             banner.style.display = 'block';
-            setTimeout(() => banner.classList.add('show'), 100);
+            setTimeout(() => {
+                banner.classList.add('show');
+            }, 100);
         }
     }
-    
+
     hideBanner() {
         const banner = document.getElementById('cookie-banner');
         if (banner) {
             banner.classList.remove('show');
-            setTimeout(() => banner.style.display = 'none', 300);
+            setTimeout(() => {
+                banner.style.display = 'none';
+            }, 300);
         }
     }
-    
-    showNotification(message, type) {
-        // Implementar notificação se necessário
-        console.log(`${type}: ${message}`);
+
+    showConfirmation(preferences) {
+        const message = preferences.analytics ? 
+            'Preferências de cookies salvas com sucesso!' :
+            'Cookies essenciais ativados. Sua privacidade é importante para nós.';
+        
+        this.showNotification(message, 'success');
+    }
+
+    showNotification(message, type = 'info') {
+        if (typeof showNotification === 'function') {
+            showNotification(message, type);
+        } else {
+            console.log(`${type.toUpperCase()}: ${message}`);
+        }
+    }
+
+    applyPreferences(preferences) {
+        if (preferences.analytics) {
+            this.enableAnalytics();
+        } else {
+            this.disableAnalytics();
+        }
+
+        if (preferences.personalization) {
+            this.enablePersonalization();
+        } else {
+            this.disablePersonalization();
+        }
+    }
+
+    enableAnalytics() {
+        console.log('📊 Analytics ativado');
+    }
+
+    disableAnalytics() {
+        console.log('📊 Analytics desativado');
+    }
+
+    enablePersonalization() {
+        console.log('🎨 Personalização ativada');
+    }
+
+    disablePersonalization() {
+        console.log('🎨 Personalização desativada');
+    }
+
+    acceptAll() {
+        this.saveCookiePreferences({
+            essential: true,
+            analytics: true,
+            personalization: true,
+            marketing: false
+        });
+    }
+
+    acceptEssential() {
+        this.saveCookiePreferences({
+            essential: true,
+            analytics: false,
+            personalization: false,
+            marketing: false
+        });
+    }
+
+    customPreferences(analytics, personalization) {
+        this.saveCookiePreferences({
+            essential: true,
+            analytics: analytics,
+            personalization: personalization,
+            marketing: false
+        });
+    }
+
+    isAccepted() {
+        const prefs = this.getCookiePreferences();
+        return prefs !== null;
     }
 }
 
@@ -301,24 +152,55 @@ class CookieManager {
 
 class GeolocationManager {
     constructor() {
-        this.cacheKey = 'netfyber_location';
-        this.cacheDuration = 5 * 60 * 1000; // 5 minutos
+        this.timeout = 10000;
+        this.maxAge = 5 * 60 * 1000;
+        this.lastLocation = null;
         this.init();
     }
-    
-    async init() {
-        const cachedLocation = this.getCachedLocation();
-        if (cachedLocation) {
-            this.updateLocationDisplay(cachedLocation);
+
+    init() {
+        this.loadCachedLocation();
+        
+        if (!this.hasLocationPermissionDenied()) {
+            setTimeout(() => {
+                this.getCurrentLocation().catch(() => {});
+            }, 2000);
         }
     }
-    
-    async getLocation() {
-        if (!navigator.geolocation) {
-            return this.showLocationError('Geolocalização não suportada');
+
+    hasLocationPermissionDenied() {
+        try {
+            return localStorage.getItem('location_permission_denied') === 'true';
+        } catch {
+            return false;
         }
-        
+    }
+
+    setLocationPermissionDenied() {
+        try {
+            localStorage.setItem('location_permission_denied', 'true');
+        } catch (error) {
+            console.warn('Não foi possível salvar preferência de localização');
+        }
+    }
+
+    async getCurrentLocation() {
+        if (this.lastLocation && (Date.now() - this.lastLocation.timestamp < this.maxAge)) {
+            return this.lastLocation;
+        }
+
         return new Promise((resolve, reject) => {
+            if (!('geolocation' in navigator)) {
+                reject(new Error('Geolocalização não suportada'));
+                return;
+            }
+
+            const options = {
+                enableHighAccuracy: false,
+                timeout: this.timeout,
+                maximumAge: this.maxAge
+            };
+
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
                     try {
@@ -327,116 +209,371 @@ class GeolocationManager {
                             position.coords.longitude
                         );
                         
-                        this.cacheLocation(location);
-                        this.updateLocationDisplay(location);
-                        resolve(location);
+                        this.lastLocation = {
+                            ...location,
+                            timestamp: Date.now(),
+                            coords: position.coords
+                        };
+                        
+                        this.saveToCache(this.lastLocation);
+                        resolve(this.lastLocation);
+                        
                     } catch (error) {
                         reject(error);
                     }
                 },
                 (error) => {
-                    this.showLocationError(this.getErrorMessage(error));
-                    reject(error);
+                    const errorMessage = this.getErrorMessage(error);
+                    reject(new Error(errorMessage));
                 },
-                {
-                    enableHighAccuracy: false,
-                    timeout: 10000,
-                    maximumAge: this.cacheDuration
-                }
+                options
             );
         });
     }
-    
+
     async reverseGeocode(lat, lon) {
         try {
             const response = await fetch(
                 `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=pt-BR`
             );
-            
-            if (!response.ok) throw new Error('Erro na requisição');
-            
+
+            if (!response.ok) throw new Error('Erro na requisição de geocoding');
+
             const data = await response.json();
+            
             return {
-                city: data.address.city || data.address.town || data.address.village || 'Cidade',
-                state: data.address.state || 'Estado',
-                displayName: data.display_name || ''
+                city: data.address.city || data.address.town || data.address.village || 'Cidade desconhecida',
+                state: data.address.state || 'Estado desconhecido',
+                country: data.address.country || 'País desconhecido',
+                displayName: data.display_name || '',
+                lat: lat,
+                lon: lon
             };
-        } catch {
+            
+        } catch (error) {
+            console.warn('Erro no reverse geocoding:', error);
             return {
-                city: `Lat: ${lat.toFixed(4)}`,
-                state: `Lon: ${lon.toFixed(4)}`,
-                displayName: ''
+                city: 'Localização aproximada',
+                state: `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`,
+                country: '',
+                displayName: '',
+                lat: lat,
+                lon: lon
             };
         }
     }
-    
+
     getErrorMessage(error) {
-        switch(error.code) {
+        switch (error.code) {
             case error.PERMISSION_DENIED:
-                return 'Permissão de localização negada';
+                this.setLocationPermissionDenied();
+                return 'Permissão de localização negada.';
             case error.POSITION_UNAVAILABLE:
-                return 'Localização indisponível';
+                return 'Localização indisponível. Verifique sua conexão e GPS.';
             case error.TIMEOUT:
-                return 'Tempo esgotado';
+                return 'Tempo de espera esgotado. Tente novamente.';
             default:
-                return 'Erro desconhecido';
+                return 'Erro ao obter localização. Tente novamente mais tarde.';
         }
     }
-    
-    cacheLocation(location) {
+
+    loadCachedLocation() {
         try {
-            const cacheData = {
-                ...location,
-                timestamp: Date.now()
-            };
-            localStorage.setItem(this.cacheKey, JSON.stringify(cacheData));
-        } catch {
-            // Ignora erros de cache
-        }
-    }
-    
-    getCachedLocation() {
-        try {
-            const cached = localStorage.getItem(this.cacheKey);
+            const cached = localStorage.getItem('netfyber_location');
             if (cached) {
                 const location = JSON.parse(cached);
-                if (Date.now() - location.timestamp < this.cacheDuration) {
-                    return location;
+                if (Date.now() - location.timestamp < this.maxAge) {
+                    this.lastLocation = location;
+                    this.updateLocationDisplay();
                 }
             }
-        } catch {
-            return null;
-        }
-        return null;
-    }
-    
-    updateLocationDisplay(location) {
-        const element = document.getElementById('user-location');
-        if (element && location) {
-            element.textContent = `${location.city} - ${location.state}`;
-            element.classList.remove('text-muted');
+        } catch (error) {
+            console.warn('Erro ao carregar localização em cache:', error);
         }
     }
+
+    saveToCache(location) {
+        try {
+            localStorage.setItem('netfyber_location', JSON.stringify(location));
+        } catch (error) {
+            console.warn('Erro ao salvar localização em cache:', error);
+        }
+    }
+
+    updateLocationDisplay() {
+        const locationElement = document.getElementById('user-location');
+        if (locationElement && this.lastLocation) {
+            locationElement.textContent = `${this.lastLocation.city} - ${this.lastLocation.state}`;
+            locationElement.classList.remove('text-muted');
+            locationElement.classList.add('geolocation-success');
+        }
+    }
+
+    async requestLocation() {
+        try {
+            const location = await this.getCurrentLocation();
+            this.updateLocationDisplay();
+            return location;
+        } catch (error) {
+            console.warn('Erro na geolocalização:', error);
+            const locationElement = document.getElementById('user-location');
+            if (locationElement) {
+                locationElement.textContent = 'Localização não disponível';
+                locationElement.classList.add('geolocation-error');
+            }
+            throw error;
+        }
+    }
+
+    async getLocation() {
+        return this.requestLocation();
+    }
+}
+
+// ========================================
+// SISTEMA DE CARROSSEL PARA PLANOS - SIMPLIFICADO
+// ========================================
+
+class CarrosselPlanos {
+    constructor() {
+        this.container = document.querySelector('.carrossel-planos-container');
+        if (!this.container) return;
+        
+        this.carrossel = this.container.querySelector('.carrossel-planos');
+        this.botaoAnterior = this.container.querySelector('.carrossel-anterior');
+        this.botaoProximo = this.container.querySelector('.carrossel-proximo');
+        this.indicadoresContainer = this.container.querySelector('.carrossel-indicadores');
+        
+        this.slides = Array.from(this.carrossel.children);
+        this.totalSlides = this.slides.length;
+        this.currentIndex = 0;
+        this.autoPlayInterval = null;
+        
+        this.init();
+    }
     
-    showLocationError(message) {
-        const element = document.getElementById('user-location');
-        if (element) {
-            element.textContent = message;
-            element.classList.add('text-danger');
+    init() {
+        if (this.totalSlides === 0) return;
+        
+        console.log(`🎯 Inicializando carrossel com ${this.totalSlides} slides`);
+        
+        this.criarIndicadores();
+        this.atualizarCarrossel();
+        this.adicionarEventos();
+        this.iniciarAutoPlay();
+    }
+    
+    getSlidesPorView() {
+        const largura = window.innerWidth;
+        if (largura >= 992) return 3;
+        if (largura >= 768) return 2;
+        return 1;
+    }
+    
+    criarIndicadores() {
+        this.indicadoresContainer.innerHTML = '';
+        const slidesPorView = this.getSlidesPorView();
+        const totalIndicadores = Math.ceil(this.totalSlides / slidesPorView);
+        
+        for (let i = 0; i < totalIndicadores; i++) {
+            const indicador = document.createElement('button');
+            indicador.className = `carrossel-indicador ${i === 0 ? 'ativo' : ''}`;
+            indicador.setAttribute('aria-label', `Ir para grupo ${i + 1}`);
+            indicador.addEventListener('click', () => this.irParaSlide(i * slidesPorView));
+            this.indicadoresContainer.appendChild(indicador);
+        }
+    }
+    
+    atualizarCarrossel() {
+        const slidesPorView = this.getSlidesPorView();
+        const translateX = -(this.currentIndex * (100 / slidesPorView));
+        
+        this.carrossel.style.transform = `translateX(${translateX}%)`;
+        
+        // Atualizar indicadores
+        const indicadores = this.indicadoresContainer.children;
+        const indicadorAtivo = Math.floor(this.currentIndex / slidesPorView);
+        
+        for (let i = 0; i < indicadores.length; i++) {
+            indicadores[i].classList.toggle('ativo', i === indicadorAtivo);
+        }
+        
+        // Atualizar botões
+        const maxIndex = Math.max(0, this.totalSlides - slidesPorView);
+        this.botaoAnterior.disabled = this.currentIndex === 0;
+        this.botaoProximo.disabled = this.currentIndex >= maxIndex;
+        
+        console.log(`📱 Slides por view: ${slidesPorView}, Índice atual: ${this.currentIndex}`);
+    }
+    
+    irParaSlide(index) {
+        const slidesPorView = this.getSlidesPorView();
+        const maxIndex = Math.max(0, this.totalSlides - slidesPorView);
+        this.currentIndex = Math.max(0, Math.min(index, maxIndex));
+        this.atualizarCarrossel();
+        this.reiniciarAutoPlay();
+    }
+    
+    proximoSlide() {
+        const slidesPorView = this.getSlidesPorView();
+        const maxIndex = Math.max(0, this.totalSlides - slidesPorView);
+        
+        if (this.currentIndex < maxIndex) {
+            this.currentIndex++;
+        } else {
+            this.currentIndex = 0;
+        }
+        this.atualizarCarrossel();
+        this.reiniciarAutoPlay();
+    }
+    
+    slideAnterior() {
+        const slidesPorView = this.getSlidesPorView();
+        if (this.currentIndex > 0) {
+            this.currentIndex--;
+        } else {
+            const maxIndex = Math.max(0, this.totalSlides - slidesPorView);
+            this.currentIndex = maxIndex;
+        }
+        this.atualizarCarrossel();
+        this.reiniciarAutoPlay();
+    }
+    
+    adicionarEventos() {
+        if (this.botaoAnterior) {
+            this.botaoAnterior.addEventListener('click', () => this.slideAnterior());
+        }
+        
+        if (this.botaoProximo) {
+            this.botaoProximo.addEventListener('click', () => this.proximoSlide());
+        }
+        
+        // Suporte a teclado
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                this.slideAnterior();
+            }
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                this.proximoSlide();
+            }
+        });
+        
+        // Redimensionamento da janela
+        window.addEventListener('resize', () => this.handleResize());
+    }
+    
+    handleResize() {
+        this.criarIndicadores();
+        this.atualizarCarrossel();
+    }
+    
+    iniciarAutoPlay() {
+        if (this.totalSlides > 1) {
+            this.autoPlayInterval = setInterval(() => {
+                this.proximoSlide();
+            }, 5000); // 5 segundos
+        }
+    }
+    
+    reiniciarAutoPlay() {
+        if (this.autoPlayInterval) {
+            clearInterval(this.autoPlayInterval);
+            this.iniciarAutoPlay();
+        }
+    }
+    
+    destruir() {
+        if (this.autoPlayInterval) {
+            clearInterval(this.autoPlayInterval);
         }
     }
 }
 
 // ========================================
-// FUNÇÕES UTILITÁRIAS
+// INICIALIZAÇÃO DO CARROSSEL
 // ========================================
 
-// Scroll suave
-function smoothScroll(target, duration = 800) {
+function initPlanosCarousel() {
+    const carrosselContainer = document.querySelector('.carrossel-planos-container');
+    if (!carrosselContainer) {
+        console.log('ℹ️ Carrossel não encontrado nesta página');
+        return;
+    }
+    
+    try {
+        window.planosCarousel = new CarrosselPlanos();
+        console.log('✅ Carrossel de planos inicializado com sucesso!');
+    } catch (error) {
+        console.error('❌ Erro ao inicializar carrossel:', error);
+    }
+}
+
+// ========================================
+// SISTEMA DE HOVER PARA HERO SECTION
+// ========================================
+
+function initHeroHover() {
+    const heroContainer = document.querySelector('.hero-container');
+    const heroContent = document.querySelector('.hero-content');
+    
+    if (!heroContainer) return;
+    
+    heroContainer.addEventListener('mouseenter', function() {
+        this.classList.add('hero-hover-active');
+        if (heroContent) heroContent.style.opacity = '1';
+    });
+    
+    heroContainer.addEventListener('mouseleave', function() {
+        this.classList.remove('hero-hover-active');
+        if (heroContent) heroContent.style.opacity = '0.7';
+    });
+}
+
+// ========================================
+// SISTEMA DE NOTIFICAÇÕES
+// ========================================
+
+function showNotification(message, type = 'info') {
+    const existingNotification = document.querySelector('.alert.position-fixed');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = `
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    `;
+    
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// ========================================
+// SMOOTH SCROLL
+// ========================================
+
+function smoothScroll(target, duration = 1000) {
     const targetElement = document.querySelector(target);
     if (!targetElement) return;
     
-    const targetPosition = targetElement.offsetTop - 80;
+    const targetPosition = targetElement.getBoundingClientRect().top + window.pageYOffset;
     const startPosition = window.pageYOffset;
     const distance = targetPosition - startPosition;
     let startTime = null;
@@ -444,137 +581,373 @@ function smoothScroll(target, duration = 800) {
     function animation(currentTime) {
         if (startTime === null) startTime = currentTime;
         const timeElapsed = currentTime - startTime;
-        const progress = Math.min(timeElapsed / duration, 1);
-        const easeProgress = easeOutCubic(progress);
-        
-        window.scrollTo(0, startPosition + distance * easeProgress);
-        
-        if (timeElapsed < duration) {
-            requestAnimationFrame(animation);
-        }
+        const run = ease(timeElapsed, startPosition, distance, duration);
+        window.scrollTo(0, run);
+        if (timeElapsed < duration) requestAnimationFrame(animation);
     }
     
-    function easeOutCubic(t) {
-        return 1 - Math.pow(1 - t, 3);
+    function ease(t, b, c, d) {
+        t /= d / 2;
+        if (t < 1) return c / 2 * t * t + b;
+        t--;
+        return -c / 2 * (t * (t - 2) - 1) + b;
     }
     
     requestAnimationFrame(animation);
 }
 
-// Inicializar tooltips do Bootstrap
-function initTooltips() {
-    const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-    tooltips.forEach(element => {
-        new bootstrap.Tooltip(element);
-    });
+// ========================================
+// LOADING STATES
+// ========================================
+
+function setLoadingState(element, isLoading) {
+    if (isLoading) {
+        element.classList.add('loading');
+        element.disabled = true;
+        const originalText = element.innerHTML;
+        element.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Carregando...`;
+        element.setAttribute('data-original-text', originalText);
+    } else {
+        element.classList.remove('loading');
+        element.disabled = false;
+        const originalText = element.getAttribute('data-original-text');
+        if (originalText) {
+            element.innerHTML = originalText;
+        }
+    }
 }
 
-// Inicializar animações de scroll
+// ========================================
+// FORM VALIDATION
+// ========================================
+
+function validateForm(form) {
+    const inputs = form.querySelectorAll('input[required], textarea[required], select[required]');
+    let isValid = true;
+    
+    inputs.forEach(input => {
+        if (!input.value.trim()) {
+            input.classList.add('is-invalid');
+            isValid = false;
+            
+            if (!input.nextElementSibling || !input.nextElementSibling.classList.contains('invalid-feedback')) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'invalid-feedback';
+                errorDiv.textContent = 'Este campo é obrigatório.';
+                input.parentNode.appendChild(errorDiv);
+            }
+        } else {
+            input.classList.remove('is-invalid');
+            const errorDiv = input.nextElementSibling;
+            if (errorDiv && errorDiv.classList.contains('invalid-feedback')) {
+                errorDiv.remove();
+            }
+        }
+    });
+    
+    return isValid;
+}
+
+// ========================================
+// BLOG FILTERS
+// ========================================
+
+function initBlogFilters() {
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const blogPosts = document.querySelectorAll('.blog-post-item');
+    const filterCount = document.getElementById('filter-count');
+
+    if (filterButtons.length === 0 || blogPosts.length === 0) {
+        return;
+    }
+
+    function updateFilterCount(filter, count) {
+        let message = '';
+        
+        switch(filter) {
+            case 'all':
+                message = `Mostrando todos os ${count} posts`;
+                break;
+            case 'tecnologia':
+                message = `${count} post${count !== 1 ? 's' : ''} de tecnologia`;
+                break;
+            case 'noticias':
+                message = `${count} post${count !== 1 ? 's' : ''} de notícias`;
+                break;
+        }
+        
+        if (filterCount) {
+            filterCount.textContent = message;
+            filterCount.style.opacity = '0.7';
+            setTimeout(() => {
+                filterCount.style.opacity = '1';
+            }, 150);
+        }
+    }
+
+    function filterPosts(filterValue) {
+        let visibleCount = 0;
+        
+        blogPosts.forEach(post => {
+            const postCategory = post.getAttribute('data-category');
+            const shouldShow = filterValue === 'all' || postCategory === filterValue;
+            
+            if (shouldShow) {
+                post.style.display = 'block';
+                post.classList.remove('hidden');
+                visibleCount++;
+                
+                setTimeout(() => {
+                    post.style.opacity = '1';
+                    post.style.transform = 'translateY(0)';
+                    post.style.visibility = 'visible';
+                }, 50);
+            } else {
+                post.style.opacity = '0';
+                post.style.transform = 'translateY(20px)';
+                
+                setTimeout(() => {
+                    post.classList.add('hidden');
+                    post.style.display = 'none';
+                    post.style.visibility = 'hidden';
+                }, 300);
+            }
+        });
+        
+        updateFilterCount(filterValue, visibleCount);
+    }
+
+    filterButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            filterButtons.forEach(btn => {
+                btn.classList.remove('active', 'btn-primary');
+                btn.classList.add('btn-outline-primary');
+            });
+            
+            this.classList.remove('btn-outline-primary');
+            this.classList.add('active', 'btn-primary');
+            
+            const filterValue = this.getAttribute('data-filter');
+            
+            const originalHTML = this.innerHTML;
+            this.innerHTML = '<i class="bi bi-arrow-repeat bi-spin me-2"></i>Filtrando...';
+            
+            setTimeout(() => {
+                const icon = filterValue === 'all' ? 'bi-grid-3x3-gap' : 
+                            filterValue === 'tecnologia' ? 'bi-cpu' : 'bi-newspaper';
+                const text = filterValue === 'all' ? 'Todos' : 
+                            filterValue === 'tecnologia' ? 'Tecnologia' : 'Notícias';
+                this.innerHTML = `<i class="bi ${icon} me-2"></i>${text}`;
+                
+                filterPosts(filterValue);
+            }, 300);
+        });
+    });
+
+    updateFilterCount('all', blogPosts.length);
+}
+
+// ========================================
+// SCROLL ANIMATIONS
+// ========================================
+
 function initScrollAnimations() {
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 entry.target.classList.add('fade-in-up');
+                observer.unobserve(entry.target);
             }
         });
-    }, {
+    }, { 
         threshold: 0.1,
         rootMargin: '0px 0px -50px 0px'
     });
     
-    document.querySelectorAll('.feature-card, .plan-card, .guia-card').forEach(el => {
+    const elementsToAnimate = document.querySelectorAll('.feature-card, .plan-card, .blog-post-item, .guia-card');
+    elementsToAnimate.forEach(el => {
         observer.observe(el);
     });
 }
 
 // ========================================
-// INICIALIZAÇÃO DA PÁGINA
+// DEBOUNCE UTILITY
+// ========================================
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// ========================================
+// FUNÇÕES DE INTERFACE PARA COOKIES
+// ========================================
+
+function aceitarTodosCookies() {
+    if (window.cookieManager) {
+        window.cookieManager.acceptAll();
+    }
+}
+
+function aceitarCookiesEssenciais() {
+    if (window.cookieManager) {
+        window.cookieManager.acceptEssential();
+    }
+}
+
+function aceitarCookies() {
+    aceitarTodosCookies();
+}
+
+function configurarCookies() {
+    const modal = new bootstrap.Modal(document.getElementById('cookieSettingsModal'));
+    modal.show();
+}
+
+function salvarPreferenciasCookies() {
+    const analytics = document.getElementById('cookieAnalytics').checked;
+    const personalization = document.getElementById('cookiePersonalization').checked;
+    
+    if (window.cookieManager) {
+        window.cookieManager.customPreferences(analytics, personalization);
+    }
+    
+    const modal = bootstrap.Modal.getInstance(document.getElementById('cookieSettingsModal'));
+    if (modal) {
+        modal.hide();
+    }
+}
+
+// ========================================
+// FUNÇÕES DE INTERFACE PARA GEOLOCALIZAÇÃO
+// ========================================
+
+async function obterLocalizacaoUsuario() {
+    try {
+        if (!window.geolocationManager) {
+            throw new Error('Gerenciador de geolocalização não inicializado');
+        }
+        await window.geolocationManager.getLocation();
+    } catch (error) {
+        console.warn('Erro na geolocalização:', error);
+        solicitarLocalizacaoManual();
+    }
+}
+
+function solicitarLocalizacaoManual() {
+    const locationElement = document.getElementById('user-location');
+    if (locationElement) {
+        locationElement.innerHTML = `
+            <button class="btn btn-sm btn-outline-light" onclick="obterLocalizacaoUsuario()">
+                <i class="bi bi-geo-alt"></i> Ativar Localização
+            </button>
+        `;
+    }
+}
+
+// ========================================
+// INICIALIZAÇÃO CORRIGIDA
 // ========================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 NetFyber - Sistema inicializando...');
+    console.log('🚀 NetFyber - Inicializando sistema...');
     
     try {
-        // Inicializar sistemas essenciais
         initEssentialSystems();
-        
-        // Inicializar componentes específicos da página
-        initPageComponents();
-        
-        console.log('✅ Sistema inicializado com sucesso!');
+        initPageSpecificComponents();
+        console.log('✅ NetFyber - Sistema inicializado com sucesso!');
     } catch (error) {
         console.error('❌ Erro na inicialização:', error);
+        showNotification('Erro na inicialização do sistema. Recarregue a página.', 'danger');
     }
 });
 
 function initEssentialSystems() {
-    // Cookies
-    window.cookieManager = new CookieManager();
+    // Sistema de Cookies
+    if (typeof CookieManager !== 'undefined') {
+        window.cookieManager = new CookieManager();
+    }
     
-    // Geolocalização
-    window.geolocationManager = new GeolocationManager();
+    // Sistema de Geolocalização
+    if (typeof GeolocationManager !== 'undefined') {
+        window.geolocationManager = new GeolocationManager();
+    }
     
-    // Tooltips
-    initTooltips();
+    // Tooltips do Bootstrap
+    initBootstrapTooltips();
     
-    // Animações
+    // Animações de scroll
     initScrollAnimations();
+}
+
+function initPageSpecificComponents() {
+    const path = window.location.pathname;
     
-    // Scroll suave para links internos
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function(e) {
-            const href = this.getAttribute('href');
-            if (href !== '#') {
+    // Inicializar carrossel na página de planos
+    if (path.includes('/planos')) {
+        console.log('📋 Página de planos detectada');
+        initPlanosCarousel();
+    }
+    
+    // Inicializar filtros do blog
+    if (path.includes('/blog')) {
+        initBlogFilters();
+    }
+    
+    // Inicializar hover do hero na página inicial
+    if (path === '/') {
+        initHeroHover();
+    }
+    
+    // Validações de formulário
+    initFormValidations();
+}
+
+function initBootstrapTooltips() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+}
+
+function initFormValidations() {
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            if (!validateForm(this)) {
                 e.preventDefault();
-                smoothScroll(href);
+                const primeiroInvalido = this.querySelector('.is-invalid');
+                if (primeiroInvalido) {
+                    primeiroInvalido.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center' 
+                    });
+                    primeiroInvalido.focus();
+                }
             }
         });
     });
 }
 
-function initPageComponents() {
-    // Carrossel de planos (se estiver na página de planos)
-    if (document.querySelector('.carrossel-planos-container')) {
-        window.planosCarousel = new PlanosCarousel();
-    }
-    
-    // Geolocalização automática
-    setTimeout(() => {
-        if (window.geolocationManager && !window.geolocationManager.getCachedLocation()) {
-            window.geolocationManager.getLocation().catch(() => {
-                // Ignora erros silenciosamente
-            });
-        }
-    }, 2000);
-}
-
 // ========================================
-// FUNÇÕES GLOBAIS PARA TEMPLATES
+// FUNÇÕES DE UTILIDADE GLOBAIS
 // ========================================
 
-window.NetFyber = {
+window.NetFyberUtils = {
+    showNotification,
     smoothScroll,
-    showNotification: (message, type = 'info') => {
-        console.log(`${type}: ${message}`);
-    },
-    aceitarCookies: () => {
-        if (window.cookieManager) {
-            window.cookieManager.saveCookiePreferences({
-                essential: true,
-                analytics: true,
-                personalization: true
-            });
-        }
-    },
-    configurarCookies: () => {
-        const modal = new bootstrap.Modal(document.getElementById('cookieSettingsModal'));
-        modal.show();
-    },
-    obterLocalizacao: () => {
-        if (window.geolocationManager) {
-            window.geolocationManager.getLocation();
-        }
-    }
+    validateForm,
+    setLoadingState,
+    initPlanosCarousel,
+    CarrosselPlanos,
+    CookieManager,
+    GeolocationManager
 };
 
 // ========================================
@@ -582,9 +955,12 @@ window.NetFyber = {
 // ========================================
 
 window.addEventListener('error', function(e) {
-    console.error('Erro capturado:', e.error);
+    console.error('Erro global capturado:', e.error);
+    showNotification('Ocorreu um erro inesperado. Tente novamente.', 'danger');
 });
 
 window.addEventListener('unhandledrejection', function(e) {
-    console.error('Promise rejeitada:', e.reason);
+    console.error('Promise rejeitada não tratada:', e.reason);
+    showNotification('Erro de carregamento. Verifique sua conexão.', 'warning');
+    e.preventDefault();
 });

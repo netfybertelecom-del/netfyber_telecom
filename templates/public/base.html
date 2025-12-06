@@ -5,63 +5,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}NetFyber Telecom{% endblock %}</title>
     
-    <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-    
-    <!-- CSS Customizado -->
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
     
-    {% block extra_css %}{% endblock %}
-    
-    <!-- Meta tags para SEO -->
-    <meta name="description" content="NetFyber Telecom - Internet de alta velocidade para sua família e negócio">
-    <meta name="keywords" content="internet, fibra óptica, telecomunicações, wifi, velocidade">
-    <meta name="author" content="NetFyber Telecom">
-    
-    <!-- Open Graph -->
-    <meta property="og:title" content="NetFyber Telecom">
-    <meta property="og:description" content="Internet de alta velocidade para sua família e negócio">
-    <meta property="og:image" content="{{ url_for('static', filename='images/logo.png') }}">
-    <meta property="og:url" content="{{ request.url }}">
-    <meta property="og:type" content="website">
-    
-    <!-- Favicon -->
-    <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}" type="image/x-icon">
-    
-    <!-- Preload para performance -->
-    <link rel="preload" href="{{ url_for('static', filename='css/main.css') }}" as="style">
-    <link rel="preload" href="{{ url_for('static', filename='js/main.js') }}" as="script">
+    <style>
+        html, body {
+            height: 100%;
+        }
+        
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        main {
+            flex: 1 0 auto;
+        }
+        
+        .site-footer {
+            margin-top: 0;
+            flex-shrink: 0;
+        }
+    </style>
 </head>
 <body>
     <!-- Top Bar -->
-    <div class="top-bar">
+    <div class="bg-primary text-white py-2">
         <div class="container">
             <div class="row align-items-center">
-                <div class="col-12 col-md-6 text-center text-md-start">
-                    <small><i class="bi bi-geo-alt me-1"></i> <span id="user-location">Carregando localização...</span></small>
+                <div class="col text-center text-md-start">
+                    <small><i class="bi bi-geo-alt"></i> <span id="user-location">Carregando localização...</span></small>
                 </div>
-                <div class="col-12 col-md-6 text-center text-md-end d-none d-md-block">
+                <div class="col-auto d-none d-md-block">
                     <small>
-                        <i class="bi bi-telephone me-1"></i> {{ configs.get('telefone_contato', '(63) 8494-1778') }}
-                        <span class="mx-2">|</span>
-                        <i class="bi bi-envelope me-1"></i> {{ configs.get('email_contato', 'contato@netfyber.com') }}
+                        <i class="bi bi-telephone"></i> {{ configs.get('telefone_contato', '(63) 8494-1778') }} | 
+                        <i class="bi bi-envelope"></i> {{ configs.get('email_contato', 'contato@netfyber.com') }}
                     </small>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Navegação Principal -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">
-                <img src="{{ url_for('static', filename='images/logo.png') }}" 
-                     alt="NetFyber Telecom" 
-                     class="img-fluid"
-                     loading="lazy">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="NetFyber" height="50">
             </a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -71,59 +62,36 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav mx-auto">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'index' %}active fw-bold{% endif %}" 
-                           href="{{ url_for('index') }}">
-                            Início
-                        </a>
+                        <a class="nav-link {{ 'active fw-bold' if request.endpoint == 'index' }}" href="{{ url_for('index') }}">Início</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'planos' %}active fw-bold{% endif %}" 
-                           href="{{ url_for('planos') }}">
-                            Planos
-                        </a>
+                        <a class="nav-link {{ 'active fw-bold' if request.endpoint == 'planos' }}" href="{{ url_for('planos') }}">Planos</a>
+                    </li>                       
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active fw-bold' if request.endpoint == 'blog' }}" href="{{ url_for('blog') }}">Blog</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'blog' %}active fw-bold{% endif %}" 
-                           href="{{ url_for('blog') }}">
-                            Blog
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'velocimetro' %}active fw-bold{% endif %}" 
-                           href="{{ url_for('velocimetro') }}">
-                            Velocímetro
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'sobre' %}active fw-bold{% endif %}" 
-                           href="{{ url_for('sobre') }}">
-                            Sobre Nós
-                        </a>
+                        <a class="nav-link {{ 'active fw-bold' if request.endpoint == 'velocimetro' }}" href="{{ url_for('velocimetro') }}">Velocímetro</a>
                     </li>
                 </ul>
                 
-                <a href="https://wa.me/{{ configs.get('whatsapp_numero', '556384941778') }}" 
-                   class="btn btn-primary d-none d-lg-inline-flex align-items-center"
-                   target="_blank">
-                    <i class="bi bi-whatsapp me-2"></i> Fale Conosco
+                <a href="{{ url_for('sobre') }}" class="btn btn-primary">
+                    <i class="bi bi-info-circle"></i> Sobre Nós
                 </a>
             </div>
         </div>
     </nav>
 
-    <!-- Conteúdo Principal -->
     <main>
         {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
-    <footer class="site-footer py-5">
-        <div class="container">
+    <footer class="bg-primary text-white site-footer">
+        <div class="container py-5">
             <div class="row g-4">
                 <div class="col-md-4">
-                    <h5 class="text-warning mb-3">
-                        <i class="bi bi-clock me-2"></i> Horários
-                    </h5>
+                    <h5 class="text-warning mb-3"><i class="bi bi-clock"></i> HORÁRIOS</h5>
                     <p class="mb-1"><strong>SEGUNDA A SEXTA</strong></p>
                     <p class="mb-3">{{ configs.get('horario_segunda_sexta', '08h às 18h') }}</p>
                     <p class="mb-1"><strong>SÁBADO</strong></p>
@@ -131,27 +99,19 @@
                 </div>
                 
                 <div class="col-md-4">
-                    <h5 class="text-warning mb-3">
-                        <i class="bi bi-geo-alt me-2"></i> Endereço
-                    </h5>
-                    <p class="mb-0">{{ configs.get('endereco', 'AV. Tocantins – 934, Centro – Sítio Novo – TO') | safe }}</p>
+                    <h5 class="text-warning mb-3"><i class="bi bi-geo-alt"></i> ENDEREÇO</h5>
+                    <p class="mb-0">
+                        {{ configs.get('endereco', 'AV. Tocantins – 934, Centro – Sítio Novo – TO<br>Axixá TO / Juverlândia / São Pedro / Folha Seca / Morada Nova / Santa Luzia / Boa Esperança') | safe }}
+                    </p>
                 </div>
                 
                 <div class="col-md-4">
-                    <h5 class="text-warning mb-3">
-                        <i class="bi bi-share me-2"></i> Redes Sociais
-                    </h5>
+                    <h5 class="text-warning mb-3"><i class="bi bi-share"></i> REDES SOCIAIS</h5>
                     <div class="d-flex gap-3">
-                        <a href="https://wa.me/{{ configs.get('whatsapp_numero', '556384941778') }}" 
-                           class="text-white fs-4" 
-                           target="_blank"
-                           aria-label="WhatsApp">
+                        <a href="https://api.whatsapp.com/send?phone={{ configs.get('whatsapp_numero', '556384941778') }}" class="text-white fs-4" target="_blank">
                             <i class="bi bi-whatsapp"></i>
                         </a>
-                        <a href="{{ configs.get('instagram_url', 'https://www.instagram.com/netfybertelecom') }}" 
-                           class="text-white fs-4" 
-                           target="_blank"
-                           aria-label="Instagram">
+                        <a href="{{ configs.get('instagram_url', 'https://www.instagram.com/netfybertelecom') }}" class="text-white fs-4" target="_blank">
                             <i class="bi bi-instagram"></i>
                         </a>
                     </div>
@@ -166,25 +126,24 @@
     </footer>
 
     <!-- Cookie Banner -->
-    <div class="cookie-banner" id="cookie-banner" style="display: none;">
+    <div class="cookie-banner" id="cookie-banner">
         <div class="container">
             <div class="row align-items-center">
-                <div class="col-md-8 mb-3 mb-md-0">
-                    <h5 class="mb-2">
-                        <i class="bi bi-shield-check me-2"></i> Preferências de Cookies
-                    </h5>
-                    <p class="mb-0 small">
-                        Utilizamos cookies para melhorar sua experiência. 
-                        <a href="#" class="text-white text-decoration-underline">Saiba mais</a>
+                <div class="col-md-8">
+                    <h5><i class="bi bi-shield-check"></i> Preferências de Cookies</h5>
+                    <p class="mb-0">
+                        Utilizamos cookies essenciais e tecnologias semelhantes de acordo com a nossa 
+                        <a href="#" class="text-white">Política de Privacidade</a> e, 
+                        ao continuar navegando, você concorda com estas condições.
                     </p>
                 </div>
-                <div class="col-md-4">
-                    <div class="d-flex flex-wrap gap-2 justify-content-md-end">
-                        <button type="button" class="btn btn-sm btn-outline-light" onclick="NetFyber.configurarCookies()">
-                            Configurar
+                <div class="col-md-4 text-md-end">
+                    <div class="cookie-banner-actions">
+                        <button type="button" class="btn cookie-btn cookie-btn-settings" onclick="configurarCookies()">
+                            <i class="bi bi-gear"></i> Configurar
                         </button>
-                        <button type="button" class="btn btn-sm btn-light" onclick="NetFyber.aceitarCookies()">
-                            Aceitar Todos
+                        <button type="button" class="btn cookie-btn cookie-btn-accept" onclick="aceitarCookies()">
+                            <i class="bi bi-check-lg"></i> Aceitar Todos
                         </button>
                     </div>
                 </div>
@@ -193,10 +152,10 @@
     </div>
 
     <!-- Modal de Configuração de Cookies -->
-    <div class="modal fade" id="cookieSettingsModal" tabindex="-1">
+    <div class="modal fade cookie-settings-modal" id="cookieSettingsModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title">
                         <i class="bi bi-shield-check me-2"></i>Configurações de Cookies
                     </h5>
@@ -204,56 +163,58 @@
                 </div>
                 <div class="modal-body">
                     <p class="text-muted mb-4">
-                        Escolha quais tipos de cookies você permite que utilizemos.
+                        Escolha quais tipos de cookies você permite que utilizemos. 
+                        Cookies essenciais são necessários para o funcionamento do site.
                     </p>
                     
-                    <div class="mb-3">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="cookieAnalytics" checked>
-                            <label class="form-check-label" for="cookieAnalytics">
-                                <strong>Cookies de Analytics</strong>
-                                <small class="d-block text-muted">Nos ajudam a entender como você usa o site</small>
-                            </label>
+                    <div class="cookie-setting-item">
+                        <div class="cookie-setting-header">
+                            <h6 class="cookie-setting-title">Cookies Essenciais</h6>
+                            <span class="cookie-setting-required">Obrigatório</span>
                         </div>
+                        <p class="cookie-setting-description">
+                            Necessários para o funcionamento básico do site. Não podem ser desativados.
+                        </p>
                     </div>
                     
-                    <div class="mb-3">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="cookiePersonalization" checked>
-                            <label class="form-check-label" for="cookiePersonalization">
-                                <strong>Cookies de Personalização</strong>
-                                <small class="d-block text-muted">Melhoram sua experiência no site</small>
-                            </label>
+                    <div class="cookie-setting-item">
+                        <div class="cookie-setting-header">
+                            <h6 class="cookie-setting-title">Cookies de Analytics</h6>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="cookieAnalytics" checked>
+                            </div>
                         </div>
+                        <p class="cookie-setting-description">
+                            Nos ajudam a entender como os visitantes interagem com o site, 
+                            fornecendo informações sobre as áreas visitadas, o tempo passado no site, 
+                            etc. Toda informação é coletada de forma anônima.
+                        </p>
+                    </div>
+                    
+                    <div class="cookie-setting-item">
+                        <div class="cookie-setting-header">
+                            <h6 class="cookie-setting-title">Cookies de Personalização</h6>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="cookiePersonalization" checked>
+                            </div>
+                        </div>
+                        <p class="cookie-setting-description">
+                            Permitem que o site forneça recursos e personalização aprimorados. 
+                            Podem ser definidos por nós ou por provedores externos.
+                        </p>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" onclick="NetFyber.aceitarCookies()">
-                        Salvar Preferências
+                    <button type="button" class="btn btn-primary" onclick="salvarPreferenciasCookies()">
+                        <i class="bi bi-check-lg me-1"></i>Salvar Preferências
                     </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    
-    {% block extra_js %}{% endblock %}
-    
-    <script>
-        // Scripts específicos do template
-        document.addEventListener('DOMContentLoaded', function() {
-            // Atualizar informações de contato em mobile
-            if (window.innerWidth < 768) {
-                const topBar = document.querySelector('.top-bar');
-                if (topBar) {
-                    topBar.querySelector('.col-md-6').classList.add('text-center');
-                }
-            }
-        });
-    </script>
 </body>
 </html>
