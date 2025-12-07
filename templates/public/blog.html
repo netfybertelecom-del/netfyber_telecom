@@ -58,7 +58,6 @@
                                     class="img-fluid h-100 w-100 post-image-content" 
                                     alt="{{ post.titulo }}"
                                     loading="lazy"
-                                    style="object-fit: cover; min-height: 250px;"
                                     onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/blog/default.jpg') }}'">
                                 <span class="post-category badge position-absolute top-0 start-0 m-3 
                                     {% if post.categoria == 'tecnologia' %}bg-primary
@@ -83,19 +82,18 @@
                                 </h2>
                                 
                                 <!-- Conteúdo Formatado -->
-                                <div class="post-content flex-grow-1">
-                                    {% if post.conteudo_html %}
-                                        {{ post.conteudo_html|safe }}
-                                    {% else %}
-                                        {{ post.get_conteudo_html()|safe }}
-                                    {% endif %}
+                                <div class="post-content flex-grow-1 mb-3">
+                                    {{ post.get_conteudo_html()|safe }}
                                 </div>
                                 
                                 <!-- Rodapé do Post -->
                                 <div class="post-footer mt-4 pt-3 border-top">
                                     <div class="row align-items-center">
                                         <div class="col-12">
-                                            <a href="{{ post.link_materia }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-lg">
+                                            <a href="{{ post.link_materia }}" 
+                                               target="_blank" 
+                                               rel="noopener noreferrer" 
+                                               class="btn btn-primary btn-lg">
                                                 <i class="bi bi-link-45deg me-2"></i> Leia a matéria completa
                                             </a>
                                         </div>
@@ -152,6 +150,7 @@
 .post-image-content {
     transition: transform 0.3s ease;
     object-fit: cover;
+    min-height: 250px;
 }
 
 .post-image:hover .post-image-content {
@@ -160,7 +159,7 @@
 
 /* Garantir proporção consistente */
 @media (max-width: 768px) {
-    .post-image {
+    .post-image-content {
         min-height: 300px;
     }
 }
@@ -183,6 +182,7 @@
     height: 0;
     margin: 0;
     overflow: hidden;
+    pointer-events: none;
 }
 
 /* Cards hover effects */
@@ -211,11 +211,19 @@
     margin: 1rem 0;
 }
 
+.post-content ol {
+    padding-left: 1.5rem;
+    margin: 1rem 0;
+}
+
 .post-content li {
     margin-bottom: 0.5rem;
     line-height: 1.5;
 }
 
+.post-content h1, 
+.post-content h2, 
+.post-content h3, 
 .post-content h4 {
     color: #0d6efd;
     margin-top: 1.5rem;
@@ -233,6 +241,19 @@
 .post-content a:hover {
     color: #0a58ca;
     border-bottom-color: #0a58ca;
+}
+
+.post-content p {
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+
+.post-content blockquote {
+    border-left: 4px solid #0d6efd;
+    padding-left: 1rem;
+    margin: 1.5rem 0;
+    color: #555;
+    font-style: italic;
 }
 
 /* Responsividade para conteúdo */
@@ -255,5 +276,66 @@
     from { opacity: 0; }
     to { opacity: 1; }
 }
+
+/* Estilo para botões de filtro ativos */
+.filter-btn.active {
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+}
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const posts = document.querySelectorAll('.blog-post-item');
+    const filterCount = document.getElementById('filter-count');
+    const totalPosts = {{ posts|length }};
+
+    // Função para filtrar posts
+    function filterPosts(category) {
+        let visibleCount = 0;
+        
+        posts.forEach(post => {
+            const postCategory = post.getAttribute('data-category');
+            
+            if (category === 'all' || postCategory === category) {
+                post.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                post.classList.add('hidden');
+            }
+        });
+        
+        // Atualizar contador
+        if (category === 'all') {
+            filterCount.textContent = `Mostrando ${totalPosts} posts`;
+        } else {
+            filterCount.textContent = `Mostrando ${visibleCount} de ${totalPosts} posts`;
+        }
+    }
+
+    // Configurar botões de filtro
+    filterButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            // Remover classe active de todos os botões
+            filterButtons.forEach(btn => {
+                btn.classList.remove('active', 'btn-primary');
+                btn.classList.add('btn-outline-primary');
+            });
+            
+            // Adicionar classe active ao botão clicado
+            this.classList.remove('btn-outline-primary');
+            this.classList.add('active', 'btn-primary');
+            
+            // Filtrar posts
+            const filterValue = this.getAttribute('data-filter');
+            filterPosts(filterValue);
+        });
+    });
+
+    // Inicializar contador
+    filterCount.textContent = `Mostrando ${totalPosts} posts`;
+});
+</script>
 {% endblock %}

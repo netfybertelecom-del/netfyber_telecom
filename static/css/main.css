@@ -881,3 +881,61 @@ body {
         font-size: 1.3rem;
     }
 }
+/* static/css/main.css - Adicione isto */
+.post-conteudo {
+    line-height: 1.6;
+    color: #333;
+    font-size: 1.1rem;
+}
+
+.post-conteudo p {
+    margin-bottom: 1.5rem;
+}
+
+.post-conteudo strong {
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.post-conteudo em {
+    font-style: italic;
+    color: #555;
+}
+
+.post-conteudo ul {
+    margin: 1rem 0;
+    padding-left: 2rem;
+    list-style-type: disc;
+}
+
+.post-conteudo li {
+    margin-bottom: 0.5rem;
+}
+
+.post-conteudo a {
+    color: #2563eb;
+    text-decoration: none;
+    border-bottom: 1px solid #93c5fd;
+    transition: all 0.3s ease;
+}
+
+.post-conteudo a:hover {
+    color: #1d4ed8;
+    border-bottom: 2px solid #2563eb;
+}
+/* Estilos gerais para conteúdo formatado */
+.post-content {
+    line-height: 1.6;
+    color: #333;
+}
+
+.post-content p {
+    margin-bottom: 1rem;
+}
+
+.post-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 1rem 0;
+}
