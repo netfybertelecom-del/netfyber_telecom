@@ -17,6 +17,11 @@ app = Flask(__name__)
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres:102030@localhost/testenet1')
+
+# IMPORTANTE: Render usa formato postgres://, SQLAlchemy precisa de postgresql://
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 ADMIN_URL_PREFIX = os.environ.get('ADMIN_URL_PREFIX', '/gestao-exclusiva-netfyber')
 ADMIN_IPS = os.environ.get('ADMIN_IPS', '127.0.0.1').split(',')
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'netfyber_admin')
@@ -633,11 +638,20 @@ def admin_configuracoes():
 
 def get_configs():
     """Retorna configurações sanitizadas"""
-    configuracoes_db = Configuracao.query.all()
-    configs = {}
-    for config in configuracoes_db:
-        configs[config.chave] = bleach.clean(config.valor)
-    return configs
+    try:
+        configuracoes_db = Configuracao.query.all()
+        configs = {}
+        for config in configuracoes_db:
+            configs[config.chave] = bleach.clean(config.valor)
+        return configs
+    except Exception as e:
+        app.logger.error(f"Erro ao buscar configurações: {e}")
+        # Retorna valores padrão se a tabela não existir
+        return {
+            'SITE_NAME': 'NetFyber',
+            'SITE_DESCRIPTION': 'Plataforma de Testes de Velocidade',
+            'MAINTENANCE_MODE': 'false'
+        }
 
 @app.route('/api/planos')
 def api_planos():
@@ -702,17 +716,18 @@ def erro_servidor(error):
     return render_template('public/500.html', configs=get_configs()), 500
 
 # ========================================
-# INICIALIZAÇÃO
+# INICIALIZAÇÃO DO BANCO DE DADOS
 # ========================================
 
-def create_tables():
-    with app.app_context():
-        try:
+def init_database():
+    """Inicializa o banco de dados automaticamente"""
+    try:
+        with app.app_context():
+            # Cria todas as tabelas
             db.create_all()
+            print("✅ Tabelas criadas/verificadas com sucesso!")
             
-            upload_path = app.config['UPLOAD_FOLDER']
-            os.makedirs(upload_path, exist_ok=True)
-            
+            # Cria usuário admin se não existir
             if AdminUser.query.filter_by(username=ADMIN_USERNAME).first() is None:
                 admin_user = AdminUser(
                     username=ADMIN_USERNAME, 
@@ -721,8 +736,9 @@ def create_tables():
                 admin_user.set_password(ADMIN_PASSWORD)
                 db.session.add(admin_user)
                 db.session.commit()
-                print("Usuário administrativo criado com sucesso")
+                print(f"✅ Usuário administrativo '{ADMIN_USERNAME}' criado com sucesso!")
             
+            # Adiciona configurações padrão se não existirem
             configs_padrao = {
                 'telefone_contato': '(63) 8494-1778',
                 'email_contato': 'contato@netfyber.com',
@@ -741,7 +757,9 @@ def create_tables():
                 if Configuracao.query.filter_by(chave=chave).first() is None:
                     config = Configuracao(chave=chave, valor=valor)
                     db.session.add(config)
+                    print(f"✅ Configuração '{chave}' adicionada.")
             
+            # Adiciona post de exemplo se não houver posts
             if Post.query.count() == 0:
                 posts_exemplo = [
                     Post(
@@ -758,16 +776,22 @@ def create_tables():
                 for post in posts_exemplo:
                     db.session.add(post)
                 
-                print("Posts de exemplo adicionados com sucesso!")
+                print("✅ Posts de exemplo adicionados com sucesso!")
             
             db.session.commit()
-            print("Banco de dados inicializado com sucesso!")
+            print("🎉 Banco de dados inicializado com sucesso!")
             
-        except Exception as e:
-            print(f"Erro ao inicializar banco de dados: {e}")
-            db.session.rollback()
+    except Exception as e:
+        print(f"⚠️ Erro ao inicializar banco de dados: {e}")
+
+# ========================================
+# INICIALIZAÇÃO DA APLICAÇÃO
+# ========================================
+
+# Inicializa o banco de dados quando o aplicativo começar
+with app.app_context():
+    init_database()
 
 if __name__ == '__main__':
-    create_tables()
     debug_mode = os.environ.get('FLASK_ENV') != 'production'
     app.run(host='0.0.0.0', port=5000, debug=debug_mode)
