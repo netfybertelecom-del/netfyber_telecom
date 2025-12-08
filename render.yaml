@@ -1,20 +1,17 @@
 services:
   - type: web
     name: netfyber-telecom
-    env: python
-    region: ohio
+    runtime: python
+    region: ohio  # ou sao-paulo
     plan: free
-    branch: main
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-      mkdir -p static/uploads/blog static/images/blog
-    startCommand: gunicorn app:app --workers=2 --threads=4 --worker-class=gthread
+    autoDeploy: true
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn app:app"
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: netfyber-db
-          property: connectionString
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: 3.11.0
       - key: SECRET_KEY
         generateValue: true
       - key: ADMIN_USERNAME
@@ -23,27 +20,24 @@ services:
         sync: false
       - key: ADMIN_EMAIL
         value: admin@netfyber.com
+      - key: ADMIN_URL_PREFIX
+        value: /gestao-exclusiva-netfyber
+      # Cloudflare R2 (opcional)
       - key: S3_ENABLED
-        value: false  # Mude para true no painel do Render se for usar Cloudflare R2
-      - key: S3_BUCKET
-        sync: false  # Defina no painel do Render
-      - key: S3_REGION
-        value: auto  # Isso pode ficar, é genérico
+        value: false
       - key: S3_ENDPOINT_URL
-        sync: false  # Defina no painel do Render
+        sync: false
       - key: S3_ACCESS_KEY_ID
         sync: false
       - key: S3_SECRET_ACCESS_KEY
         sync: false
-      - key: FLASK_ENV
-        value: production
-      - key: PYTHONUNBUFFERED
-        value: true
-    healthCheckPath: /health
-    autoDeploy: true
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        value: auto
 
-  - type: postgres
-    name: netfyber-db
+databases:
+  - name: netfyber_db
     plan: free
     databaseName: netfyber
-    ipAllowList: []
+    user: netfyber_user

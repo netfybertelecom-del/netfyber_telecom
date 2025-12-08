@@ -24,8 +24,19 @@ DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///netfyber.db')
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# Forçar SSL no PostgreSQL (necessário para Render)
+if DATABASE_URL.startswith("postgresql://") and os.environ.get('FLASK_ENV') == 'production':
+    if '?' in DATABASE_URL:
+        DATABASE_URL += '&sslmode=require'
+    else:
+        DATABASE_URL += '?sslmode=require'
+
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_recycle': 300,
+    'pool_pre_ping': True,
+}
 
 # Configurações de segurança
 ADMIN_URL_PREFIX = os.environ.get('ADMIN_URL_PREFIX', '/gestao-exclusiva-netfyber')
@@ -34,14 +45,6 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 # Configuração de upload
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'blog')
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8MB
-
-# Configurações S3 (Cloudflare R2 ou AWS S3)
-app.config['S3_ENABLED'] = os.environ.get('S3_ENABLED', 'false').lower() == 'true'
-app.config['S3_BUCKET'] = os.environ.get('S3_BUCKET')
-app.config['S3_REGION'] = os.environ.get('S3_REGION')
-app.config['S3_ENDPOINT_URL'] = os.environ.get('S3_ENDPOINT_URL')
-app.config['S3_ACCESS_KEY_ID'] = os.environ.get('S3_ACCESS_KEY_ID')
-app.config['S3_SECRET_ACCESS_KEY'] = os.environ.get('S3_SECRET_ACCESS_KEY')
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
@@ -67,6 +70,123 @@ def secure_headers(response):
     if os.environ.get('FLASK_ENV') == 'production':
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
+
+# ========================================
+# FUNÇÕES DE FORMATTAÇÃO INTELIGENTE
+# ========================================
+
+def process_markdown(content):
+    """Processa formatação estilo markdown"""
+    if not content:
+        return ""
+    
+    lines = content.split('\n')
+    processed_lines = []
+    in_list = False
+    
+    for line in lines:
+        line = line.rstrip()
+        
+        if not line:
+            if in_list:
+                processed_lines.append('</ul>')
+                in_list = False
+            processed_lines.append('<br>')
+            continue
+        
+        # Processar listas
+        if line.strip().startswith('- ') or line.strip().startswith('* '):
+            if not in_list:
+                processed_lines.append('<ul>')
+                in_list = True
+            list_item = line.strip()[2:].strip()
+            list_item = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', list_item)
+            processed_lines.append(f'<li>{list_item}</li>')
+            continue
+        else:
+            if in_list:
+                processed_lines.append('</ul>')
+                in_list = False
+        
+        # Processar títulos
+        if line.strip().startswith('### '):
+            title = line.strip()[4:].strip()
+            processed_lines.append(f'<h3>{title}</h3>')
+        elif line.strip().startswith('## '):
+            title = line.strip()[3:].strip()
+            processed_lines.append(f'<h2>{title}</h2>')
+        elif line.strip().startswith('# '):
+            title = line.strip()[2:].strip()
+            processed_lines.append(f'<h1>{title}</h1>')
+        else:
+            line = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', line)
+            processed_lines.append(line + '<br>')
+    
+    if in_list:
+        processed_lines.append('</ul>')
+    
+    return '\n'.join(processed_lines)
+
+def sanitize_html(content):
+    """Sanitização segura de HTML"""
+    if not content:
+        return ""
+    
+    # Primeiro processar o markdown
+    html_content = process_markdown(content)
+    
+    # Tags permitidas
+    allowed_tags = [
+        'p', 'br', 'strong', 'em', 'b', 'i', 'u', 'a',
+        'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'blockquote', 'img', 'span', 'div', 'table', 'tr', 'td', 'th'
+    ]
+    
+    # Atributos permitidos
+    allowed_attributes = {
+        'a': ['href', 'target', 'rel', 'title', 'class'],
+        'img': ['src', 'alt', 'title', 'width', 'height', 'class', 'style'],
+        '*': ['class', 'id', 'style']
+    }
+    
+    # Sanitizar
+    sanitized = bleach.clean(
+        html_content,
+        tags=allowed_tags,
+        attributes=allowed_attributes,
+        strip=True,
+        strip_comments=True
+    )
+    
+    # Garantir que links externos tenham target="_blank" e rel="noopener noreferrer"
+    def add_link_attributes(attrs, new):
+        href = attrs.get((None, 'href'), '')
+        if href and href.startswith(('http://', 'https://')):
+            attrs[(None, 'target')] = '_blank'
+            if (None, 'rel') in attrs:
+                attrs[(None, 'rel')] = attrs[(None, 'rel')] + ' noopener noreferrer'
+            else:
+                attrs[(None, 'rel')] = 'noopener noreferrer'
+        return attrs
+    
+    sanitized = bleach.linkify(sanitized, callbacks=[add_link_attributes])
+    
+    return sanitized
+
+def validate_url(url):
+    """Validação segura de URLs"""
+    try:
+        result = urlparse(url)
+        if result.scheme not in ('http', 'https'):
+            return False
+        if not result.netloc:
+            return False
+        return True
+    except Exception:
+        return False
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # ========================================
 # MODELOS DO BANCO DE DADOS
@@ -136,7 +256,6 @@ class Post(db.Model):
     resumo = db.Column(db.Text, nullable=False)
     categoria = db.Column(db.String(50), nullable=False)
     imagem = db.Column(db.String(500), default='default.jpg')
-    imagem_storage_type = db.Column(db.String(20), default='local')  # 'local' ou 's3'
     link_materia = db.Column(db.String(500), nullable=False)
     data_publicacao = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     ativo = db.Column(db.Boolean, default=True)
@@ -144,44 +263,75 @@ class Post(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def get_conteudo_html(self):
+        """Retorna o conteúdo formatado com a formatação inteligente"""
         if not self.conteudo:
             return "<p>Conteúdo não disponível.</p>"
-        
-        # Sanitizar HTML
-        allowed_tags = ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li', 
-                       'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'img', 'span', 'div']
-        
-        html = bleach.clean(
-            self.conteudo,
-            tags=allowed_tags,
-            attributes={'a': ['href', 'target', 'rel'], 'img': ['src', 'alt']},
-            strip=True
-        )
-        
-        # Adicionar target="_blank" a links externos
-        html = bleach.linkify(html, callbacks=[lambda attrs, _: add_target_blank(attrs)])
-        return html
+        return sanitize_html(self.conteudo)
 
     def get_data_formatada(self):
         return self.data_publicacao.strftime('%d/%m/%Y')
 
     def get_imagem_url(self):
         if self.imagem and self.imagem != 'default.jpg':
-            if self.imagem_storage_type == 's3':
-                return self.imagem
-            else:
-                return f"/static/uploads/blog/{self.imagem}"
+            return f"/static/uploads/blog/{self.imagem}"
         return "/static/images/blog/default.jpg"
-
-def add_target_blank(attrs):
-    if (None, 'href') in attrs:
-        attrs[(None, 'target')] = '_blank'
-        attrs[(None, 'rel')] = 'noopener noreferrer'
-    return attrs
 
 @login_manager.user_loader
 def load_user(user_id):
     return AdminUser.query.get(int(user_id))
+
+# ========================================
+# FUNÇÕES DE ARQUIVO
+# ========================================
+
+def save_uploaded_file(file):
+    """Salva arquivo localmente"""
+    if not file or file.filename == '':
+        return None
+    
+    if not allowed_file(file.filename):
+        return None
+    
+    try:
+        filename = f"{uuid.uuid4().hex}.{file.filename.rsplit('.', 1)[1].lower()}"
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+        
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            return filename
+    except Exception as e:
+        print(f"Erro ao salvar arquivo: {e}")
+        if 'file_path' in locals() and os.path.exists(file_path):
+            os.remove(file_path)
+    
+    return None
+
+def delete_uploaded_file(filename):
+    """Exclui arquivo localmente"""
+    if not filename or filename == 'default.jpg':
+        return False
+    
+    try:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            return True
+    except Exception:
+        return False
+    
+    return False
+
+def get_configs():
+    """Retorna configurações do site"""
+    try:
+        configuracoes_db = Configuracao.query.all()
+        configs = {}
+        for config in configuracoes_db:
+            configs[config.chave] = bleach.clean(config.valor)
+        return configs
+    except Exception:
+        return {}
 
 # ========================================
 # SINCRONIZAÇÃO DO ADMIN
@@ -210,51 +360,6 @@ def sync_admin_from_env():
         db.session.add(new_admin)
         db.session.commit()
         print(f"✅ Admin {admin_username} criado.")
-
-# ========================================
-# FUNÇÕES DE UTILIDADE
-# ========================================
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def save_uploaded_file(file):
-    """Salva arquivo usando storage.py"""
-    try:
-        from storage import save_file
-        return save_file(file)
-    except ImportError:
-        # Fallback local
-        if file and allowed_file(file.filename):
-            filename = f"{uuid.uuid4().hex}.{file.filename.rsplit('.', 1)[1].lower()}"
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(file_path)
-            return {'filename': filename, 'storage_type': 'local', 'url': f"/static/uploads/blog/{filename}"}
-    return None
-
-def delete_uploaded_file(filename, storage_type='local'):
-    """Exclui arquivo usando storage.py"""
-    try:
-        if storage_type == 's3':
-            from storage import delete_file_s3
-            return delete_file_s3(filename)
-        else:
-            from storage import delete_file_local
-            return delete_file_local(filename)
-    except Exception:
-        return False
-
-def get_configs():
-    """Retorna configurações do site"""
-    try:
-        configuracoes_db = Configuracao.query.all()
-        configs = {}
-        for config in configuracoes_db:
-            configs[config.chave] = bleach.clean(config.valor)
-        return configs
-    except Exception:
-        return {}
 
 # ========================================
 # ROTAS PÚBLICAS
@@ -353,33 +458,44 @@ def adicionar_post():
                     flash(f'O campo {field} é obrigatório.', 'error')
                     return redirect(request.url)
             
+            # Validar URL
+            link_materia = request.form['link_materia'].strip()
+            if not validate_url(link_materia):
+                flash('URL da matéria inválida.', 'error')
+                return redirect(request.url)
+            
             # Processar imagem
             imagem_filename = 'default.jpg'
-            imagem_storage_type = 'local'
             
             if 'imagem' in request.files:
                 file = request.files['imagem']
                 if file and file.filename != '':
-                    result = save_uploaded_file(file)
-                    if result:
-                        imagem_filename = result['filename']
-                        imagem_storage_type = result['storage_type']
+                    uploaded_filename = save_uploaded_file(file)
+                    if uploaded_filename:
+                        imagem_filename = uploaded_filename
             
-            # Criar resumo
-            conteudo_limpo = re.sub(r'<[^>]+>', '', request.form['conteudo'])
-            conteudo_limpo = re.sub(r'\*\*.*?\*\*', '', conteudo_limpo)
-            resumo = conteudo_limpo[:150] + '...' if len(conteudo_limpo) > 150 else conteudo_limpo
+            # Validar data
+            try:
+                data_publicacao = datetime.strptime(request.form['data_publicacao'], '%d/%m/%Y')
+            except ValueError:
+                flash('Formato de data inválido. Use DD/MM/AAAA.', 'error')
+                return redirect(request.url)
+            
+            # Criar resumo usando a formatação inteligente
+            conteudo_html = sanitize_html(request.form['conteudo'])
+            # Remover tags HTML para o resumo
+            conteudo_texto = re.sub(r'<[^>]+>', '', conteudo_html)
+            resumo = conteudo_texto[:150] + '...' if len(conteudo_texto) > 150 else conteudo_texto
             
             # Criar post
             novo_post = Post(
                 titulo=bleach.clean(request.form['titulo']),
-                conteudo=bleach.clean(request.form['conteudo']),
+                conteudo=request.form['conteudo'],  # Mantém o conteúdo original com markdown
                 resumo=bleach.clean(resumo),
                 categoria=bleach.clean(request.form['categoria']),
                 imagem=imagem_filename,
-                imagem_storage_type=imagem_storage_type,
-                link_materia=request.form['link_materia'],
-                data_publicacao=datetime.strptime(request.form['data_publicacao'], '%d/%m/%Y')
+                link_materia=link_materia,
+                data_publicacao=data_publicacao
             )
             
             db.session.add(novo_post)
@@ -405,21 +521,40 @@ def editar_post(post_id):
             if 'imagem' in request.files:
                 file = request.files['imagem']
                 if file and file.filename != '':
-                    result = save_uploaded_file(file)
-                    if result:
+                    uploaded_filename = save_uploaded_file(file)
+                    if uploaded_filename:
                         # Excluir imagem antiga
                         if post.imagem and post.imagem != 'default.jpg':
-                            delete_uploaded_file(post.imagem, post.imagem_storage_type)
+                            delete_uploaded_file(post.imagem)
                         
-                        post.imagem = result['filename']
-                        post.imagem_storage_type = result['storage_type']
+                        post.imagem = uploaded_filename
             
-            # Atualizar outros campos
+            # Validar URL
+            link_materia = request.form['link_materia'].strip()
+            if not validate_url(link_materia):
+                flash('URL da matéria inválida.', 'error')
+                return redirect(request.url)
+            
+            # Validar data
+            try:
+                data_publicacao = datetime.strptime(request.form['data_publicacao'], '%d/%m/%Y')
+            except ValueError:
+                flash('Formato de data inválido. Use DD/MM/AAAA.', 'error')
+                return redirect(request.url)
+            
+            # Criar resumo usando a formatação inteligente
+            conteudo_html = sanitize_html(request.form['conteudo'])
+            # Remover tags HTML para o resumo
+            conteudo_texto = re.sub(r'<[^>]+>', '', conteudo_html)
+            resumo = conteudo_texto[:150] + '...' if len(conteudo_texto) > 150 else conteudo_texto
+            
+            # Atualizar post
             post.titulo = bleach.clean(request.form['titulo'])
-            post.conteudo = bleach.clean(request.form['conteudo'])
+            post.conteudo = request.form['conteudo']  # Mantém o conteúdo original com markdown
+            post.resumo = bleach.clean(resumo)
             post.categoria = bleach.clean(request.form['categoria'])
-            post.link_materia = request.form['link_materia']
-            post.data_publicacao = datetime.strptime(request.form['data_publicacao'], '%d/%m/%Y')
+            post.link_materia = link_materia
+            post.data_publicacao = data_publicacao
             post.updated_at = datetime.utcnow()
             
             db.session.commit()
@@ -440,7 +575,7 @@ def excluir_post(post_id):
         
         # Excluir imagem se não for default
         if post.imagem and post.imagem != 'default.jpg':
-            delete_uploaded_file(post.imagem, post.imagem_storage_type)
+            delete_uploaded_file(post.imagem)
         
         post.ativo = False
         db.session.commit()
@@ -562,12 +697,12 @@ def erro_servidor(error):
     return render_template('public/500.html', configs=get_configs()), 500
 
 # ========================================
-# INICIALIZAÇÃO
+# INICIALIZAÇÃO DO BANCO DE DADOS
 # ========================================
 
 def init_database():
     """Inicializa o banco de dados e configurações padrão"""
-    with app.app_context():
+    try:
         db.create_all()
         print("✅ Tabelas criadas/verificadas com sucesso!")
         
@@ -595,11 +730,36 @@ def init_database():
         
         db.session.commit()
         print("🎉 Banco de dados inicializado com sucesso!")
+    except Exception as e:
+        print(f"❌ Erro ao inicializar banco: {e}")
+        db.session.rollback()
 
-# Inicializar banco de dados
-with app.app_context():
-    init_database()
+# ========================================
+# INICIALIZAÇÃO DA APLICAÇÃO
+# ========================================
+
+# Flag para controlar se o banco já foi inicializado
+_db_initialized = False
+
+@app.before_request
+def initialize_database():
+    """Inicializa o banco de dados na primeira requisição"""
+    global _db_initialized
+    if not _db_initialized:
+        with app.app_context():
+            init_database()
+        _db_initialized = True
+
+# ========================================
+# PONTO DE ENTRADA PRINCIPAL
+# ========================================
 
 if __name__ == '__main__':
+    # Para desenvolvimento local
+    port = int(os.environ.get("PORT", 5000))
     debug_mode = os.environ.get('FLASK_ENV') != 'production'
-    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
+    
+    # Garantir que o diretório de uploads exista
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)
