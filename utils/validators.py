@@ -8,7 +8,6 @@ def validate_email(email):
 
 def validate_phone(phone):
     """Validação de telefone brasileiro"""
-    # Remove caracteres não numéricos
     phone = re.sub(r'\D', '', phone)
     return len(phone) >= 10 and len(phone) <= 11
 
@@ -24,7 +23,6 @@ def validate_password(password):
     """Validação de senha forte"""
     if len(password) < 8:
         return False
-    # Pelo menos uma letra maiúscula, uma minúscula, um número e um caractere especial
     if not re.search(r'[A-Z]', password):
         return False
     if not re.search(r'[a-z]', password):

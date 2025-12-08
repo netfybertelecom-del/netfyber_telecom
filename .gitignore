@@ -1,98 +1,87 @@
-    # ========================================
-    # SEGREDOS E CONFIGURAÇÕES
-    # ========================================
-    .env
-    .env.*
-    !.env.example
-    secrets/
-    credentials/
-    config/
-    keys/
+# ========================================
+# SEGREDOS E CONFIGURAÇÕES
+# ========================================
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+config/
+keys/
 
-    # Render
-    render.yaml
-    render.yml
-    .render/
-    render-*
+# ========================================
+# PYTHON
+# ========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-    # Docker
-    Dockerfile*
-    docker-compose*
-    .dockerignore
+# Virtual environments
+venv/
+env/
+ENV/
+.env/
+.venv/
 
-    # ========================================
-    # PYTHON
-    # ========================================
-    __pycache__/
-    *.py[cod]
-    *$py.class
-    *.so
-    .Python
-    build/
-    develop-eggs/
-    dist/
-    downloads/
-    eggs/
-    .eggs/
-    lib/
-    lib64/
-    parts/
-    sdist/
-    var/
-    wheels/
-    pip-wheel-metadata/
-    share/python-wheels/
-    *.egg-info/
-    .installed.cfg
-    *.egg
-    MANIFEST
+# ========================================
+# BANCO DE DADOS
+# ========================================
+*.db
+*.sqlite
+*.sqlite3
 
-    # Virtual environments
-    venv/
-    env/
-    ENV/
-    .env/
-    .venv/
+# ========================================
+# LOGS E TEMPORÁRIOS
+# ========================================
+*.log
+logs/
+*.bak
+*.backup
+*.tmp
+*.temp
 
-    # IDE
-    .vscode/
-    .idea/
-    *.swp
-    *.swo
-    *~
+# ========================================
+# SISTEMA
+# ========================================
+.DS_Store
+Thumbs.db
+desktop.ini
 
-    # ========================================
-    # BANCO DE DADOS
-    # ========================================
-    *.db
-    *.sqlite
-    *.sqlite3
+# ========================================
+# UPLOADS (não versionar arquivos enviados)
+# ========================================
+static/uploads/*
+!static/uploads/.gitkeep
 
-    # ========================================
-    # LOGS E TEMPORÁRIOS
-    # ========================================
-    *.log
-    logs/
-    *.bak
-    *.backup
-    *.tmp
-    *.temp
+# ========================================
+# RENDER E DEPLOY
+# ========================================
+render.yaml
+render.yml
+.render/
+render-*
 
-    # ========================================
-    # SISTEMA
-    # ========================================
-    .DS_Store
-    Thumbs.db
-    desktop.ini
-
-    # ========================================
-    # UPLOADS (mantenha estrutura, mas não os arquivos)
-    # ========================================
-    static/uploads/*
-    !static/uploads/.gitkeep
-
-    # ========================================
-    # PROJETO NETFYBER
-    # ========================================
-    instance/
-    .netfyber-cache/
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
