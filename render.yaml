@@ -1,10 +1,9 @@
 services:
   - type: web
     name: netfyber-telecom
-    runtime: python
-    region: ohio  # ou sao-paulo
+    env: python
+    region: ohio
     plan: free
-    autoDeploy: true
     buildCommand: "./build.sh"
     startCommand: "gunicorn app:app"
     envVars:
@@ -22,22 +21,16 @@ services:
         value: admin@netfyber.com
       - key: ADMIN_URL_PREFIX
         value: /gestao-exclusiva-netfyber
-      # Cloudflare R2 (opcional)
-      - key: S3_ENABLED
-        value: false
-      - key: S3_ENDPOINT_URL
+      # Cloudflare R2 - PRODUÇÃO
+      - key: R2_ENABLED
+        value: true
+      - key: R2_ENDPOINT_URL
+        value: https://3825287deb577b1c158b966f5c441e57.r2.cloudflarestorage.com
+      - key: R2_PUBLIC_URL
+        value: https://pub-3825287deb577b1c158b966f5c441e57.r2.dev
+      - key: R2_ACCESS_KEY_ID
         sync: false
-      - key: S3_ACCESS_KEY_ID
+      - key: R2_SECRET_ACCESS_KEY
         sync: false
-      - key: S3_SECRET_ACCESS_KEY
-        sync: false
-      - key: S3_BUCKET
-        sync: false
-      - key: S3_REGION
-        value: auto
-
-databases:
-  - name: netfyber_db
-    plan: free
-    databaseName: netfyber
-    user: netfyber_user
+      - key: R2_BUCKET
+        value: netfyber-files

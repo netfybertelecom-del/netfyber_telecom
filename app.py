@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort, current_app
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -9,6 +9,9 @@ import bleach
 import re
 from urllib.parse import urlparse
 import secrets
+import boto3
+from botocore.exceptions import ClientError
+from functools import lru_cache
 
 # ========================================
 # CONFIGURAÇÃO DA APLICAÇÃO
@@ -42,10 +45,19 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 ADMIN_URL_PREFIX = os.environ.get('ADMIN_URL_PREFIX', '/gestao-exclusiva-netfyber')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 
-# Configuração de upload
+# Configuração de upload LOCAL
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'blog')
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8MB
 
+# Configurações Cloudflare R2 (para produção)
+app.config['R2_ENABLED'] = os.environ.get('R2_ENABLED', 'false').lower() == 'true'
+app.config['R2_ENDPOINT_URL'] = os.environ.get('R2_ENDPOINT_URL', '')
+app.config['R2_PUBLIC_URL'] = os.environ.get('R2_PUBLIC_URL', '')
+app.config['R2_ACCESS_KEY_ID'] = os.environ.get('R2_ACCESS_KEY_ID', '')
+app.config['R2_SECRET_ACCESS_KEY'] = os.environ.get('R2_SECRET_ACCESS_KEY', '')
+app.config['R2_BUCKET'] = os.environ.get('R2_BUCKET', 'netfyber-files')
+
+# Extensões permitidas
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 db = SQLAlchemy(app)
@@ -65,14 +77,185 @@ login_manager.login_message_category = "warning"
 def secure_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "no-referrer"
-    response.headers["Content-Security-Policy"] = "default-src 'self' https: data: 'unsafe-inline';"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     if os.environ.get('FLASK_ENV') == 'production':
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 # ========================================
-# FUNÇÕES DE FORMATTAÇÃO INTELIGENTE
+# FUNÇÕES DE ARMAZENAMENTO DUAL (LOCAL + R2)
+# ========================================
+
+@lru_cache(maxsize=1)
+def get_r2_client():
+    """Retorna cliente S3 configurado para Cloudflare R2 (produção)"""
+    if not current_app.config.get('R2_ENABLED'):
+        return None
+    
+    try:
+        client = boto3.client(
+            's3',
+            endpoint_url=current_app.config.get('R2_ENDPOINT_URL'),
+            aws_access_key_id=current_app.config.get('R2_ACCESS_KEY_ID'),
+            aws_secret_access_key=current_app.config.get('R2_SECRET_ACCESS_KEY'),
+            region_name='auto'
+        )
+        # Testa a conexão
+        client.list_buckets()
+        print("✅ Cloudflare R2 conectado com sucesso!")
+        return client
+    except Exception as e:
+        print(f"⚠️ Cloudflare R2 não disponível: {e}")
+        return None
+
+def allowed_file(filename):
+    """Verifica se o arquivo tem uma extensão permitida"""
+    if not filename or '.' not in filename:
+        return False
+    return filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def save_image_local(file):
+    """Salva imagem localmente (desenvolvimento)"""
+    if not file or file.filename == '':
+        return None
+    
+    if not allowed_file(file.filename):
+        return None
+    
+    try:
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        filename = f"{uuid.uuid4().hex}.{ext}"
+        
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        os.makedirs(upload_folder, exist_ok=True)
+        
+        file_path = os.path.join(upload_folder, filename)
+        file.save(file_path)
+        
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            print(f"✅ Imagem salva localmente: {filename}")
+            return filename
+            
+    except Exception as e:
+        print(f"❌ Erro ao salvar imagem localmente: {e}")
+    
+    return None
+
+def save_image_r2(file):
+    """Salva imagem no Cloudflare R2 (produção)"""
+    if not file or file.filename == '':
+        return None
+    
+    if not allowed_file(file.filename):
+        return None
+    
+    client = get_r2_client()
+    if not client:
+        print("⚠️ Cliente R2 não disponível, usando fallback local")
+        return save_image_local(file)
+    
+    try:
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        filename = f"{uuid.uuid4().hex}.{ext}"
+        bucket_name = current_app.config.get('R2_BUCKET')
+        
+        # Determina content type
+        content_type = f'image/{ext}'
+        if ext == 'jpg':
+            content_type = 'image/jpeg'
+        
+        client.upload_fileobj(
+            file,
+            bucket_name,
+            filename,
+            ExtraArgs={
+                'ACL': 'public-read',
+                'ContentType': content_type
+            }
+        )
+        
+        print(f"✅ Imagem enviada para Cloudflare R2: {filename}")
+        return filename
+        
+    except Exception as e:
+        print(f"❌ Erro ao enviar para R2: {e}")
+        print("⚠️ Usando fallback local")
+        return save_image_local(file)
+
+def save_blog_image(file):
+    """Salva imagem do blog usando método apropriado"""
+    if not file or file.filename == '':
+        return None
+    
+    if current_app.config.get('R2_ENABLED'):
+        return save_image_r2(file)
+    else:
+        return save_image_local(file)
+
+def delete_image_local(filename):
+    """Exclui imagem localmente"""
+    if not filename or filename == 'default.jpg':
+        return False
+    
+    try:
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        file_path = os.path.join(upload_folder, filename)
+        
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"✅ Imagem local excluída: {filename}")
+            return True
+    except Exception as e:
+        print(f"❌ Erro ao excluir imagem local: {e}")
+    
+    return False
+
+def delete_image_r2(filename):
+    """Exclui imagem do Cloudflare R2"""
+    if not filename or filename == 'default.jpg':
+        return False
+    
+    client = get_r2_client()
+    if not client:
+        return delete_image_local(filename)
+    
+    try:
+        bucket_name = current_app.config.get('R2_BUCKET')
+        client.delete_object(Bucket=bucket_name, Key=filename)
+        print(f"✅ Imagem excluída do R2: {filename}")
+        return True
+    except Exception as e:
+        print(f"❌ Erro ao excluir do R2: {e}")
+        return False
+
+def delete_blog_image(filename):
+    """Exclui imagem do blog usando método apropriado"""
+    if not filename or filename == 'default.jpg':
+        return False
+    
+    if current_app.config.get('R2_ENABLED'):
+        return delete_image_r2(filename)
+    else:
+        return delete_image_local(filename)
+
+def get_image_url(filename):
+    """Retorna URL da imagem baseada no ambiente"""
+    if not filename or filename == 'default.jpg':
+        return "/static/images/blog/default.jpg"
+    
+    # Se R2 habilitado, usa URL do Cloudflare R2
+    if current_app.config.get('R2_ENABLED'):
+        public_url_base = current_app.config.get('R2_PUBLIC_URL', '').rstrip('/')
+        bucket_name = current_app.config.get('R2_BUCKET')
+        
+        if public_url_base:
+            return f"{public_url_base}/{bucket_name}/{filename}"
+    
+    # Fallback para URL local
+    return f"/static/uploads/blog/{filename}"
+
+# ========================================
+# FUNÇÕES DE FORMATAÇÃO INTELIGENTE
 # ========================================
 
 def process_markdown(content):
@@ -139,14 +322,14 @@ def sanitize_html(content):
     allowed_tags = [
         'p', 'br', 'strong', 'em', 'b', 'i', 'u', 'a',
         'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'blockquote', 'img', 'span', 'div', 'table', 'tr', 'td', 'th'
+        'blockquote', 'img', 'span', 'div'
     ]
     
     # Atributos permitidos
     allowed_attributes = {
         'a': ['href', 'target', 'rel', 'title', 'class'],
         'img': ['src', 'alt', 'title', 'width', 'height', 'class', 'style'],
-        '*': ['class', 'id', 'style']
+        '*': ['class', 'style']
     }
     
     # Sanitizar
@@ -163,10 +346,7 @@ def sanitize_html(content):
         href = attrs.get((None, 'href'), '')
         if href and href.startswith(('http://', 'https://')):
             attrs[(None, 'target')] = '_blank'
-            if (None, 'rel') in attrs:
-                attrs[(None, 'rel')] = attrs[(None, 'rel')] + ' noopener noreferrer'
-            else:
-                attrs[(None, 'rel')] = 'noopener noreferrer'
+            attrs[(None, 'rel')] = 'noopener noreferrer'
         return attrs
     
     sanitized = bleach.linkify(sanitized, callbacks=[add_link_attributes])
@@ -184,9 +364,6 @@ def validate_url(url):
         return True
     except Exception:
         return False
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # ========================================
 # MODELOS DO BANCO DE DADOS
@@ -272,55 +449,16 @@ class Post(db.Model):
         return self.data_publicacao.strftime('%d/%m/%Y')
 
     def get_imagem_url(self):
-        if self.imagem and self.imagem != 'default.jpg':
-            return f"/static/uploads/blog/{self.imagem}"
-        return "/static/images/blog/default.jpg"
+        """Retorna a URL da imagem usando a função get_image_url"""
+        return get_image_url(self.imagem)
 
 @login_manager.user_loader
 def load_user(user_id):
     return AdminUser.query.get(int(user_id))
 
 # ========================================
-# FUNÇÕES DE ARQUIVO
+# FUNÇÕES AUXILIARES
 # ========================================
-
-def save_uploaded_file(file):
-    """Salva arquivo localmente"""
-    if not file or file.filename == '':
-        return None
-    
-    if not allowed_file(file.filename):
-        return None
-    
-    try:
-        filename = f"{uuid.uuid4().hex}.{file.filename.rsplit('.', 1)[1].lower()}"
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(file_path)
-        
-        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-            return filename
-    except Exception as e:
-        print(f"Erro ao salvar arquivo: {e}")
-        if 'file_path' in locals() and os.path.exists(file_path):
-            os.remove(file_path)
-    
-    return None
-
-def delete_uploaded_file(filename):
-    """Exclui arquivo localmente"""
-    if not filename or filename == 'default.jpg':
-        return False
-    
-    try:
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            return True
-    except Exception:
-        return False
-    
-    return False
 
 def get_configs():
     """Retorna configurações do site"""
@@ -470,7 +608,7 @@ def adicionar_post():
             if 'imagem' in request.files:
                 file = request.files['imagem']
                 if file and file.filename != '':
-                    uploaded_filename = save_uploaded_file(file)
+                    uploaded_filename = save_blog_image(file)
                     if uploaded_filename:
                         imagem_filename = uploaded_filename
             
@@ -521,11 +659,11 @@ def editar_post(post_id):
             if 'imagem' in request.files:
                 file = request.files['imagem']
                 if file and file.filename != '':
-                    uploaded_filename = save_uploaded_file(file)
+                    uploaded_filename = save_blog_image(file)
                     if uploaded_filename:
                         # Excluir imagem antiga
                         if post.imagem and post.imagem != 'default.jpg':
-                            delete_uploaded_file(post.imagem)
+                            delete_blog_image(post.imagem)
                         
                         post.imagem = uploaded_filename
             
@@ -575,7 +713,7 @@ def excluir_post(post_id):
         
         # Excluir imagem se não for default
         if post.imagem and post.imagem != 'default.jpg':
-            delete_uploaded_file(post.imagem)
+            delete_blog_image(post.imagem)
         
         post.ativo = False
         db.session.commit()
@@ -738,7 +876,6 @@ def init_database():
 # INICIALIZAÇÃO DA APLICAÇÃO
 # ========================================
 
-# Flag para controlar se o banco já foi inicializado
 _db_initialized = False
 
 @app.before_request
@@ -761,5 +898,10 @@ if __name__ == '__main__':
     
     # Garantir que o diretório de uploads exista
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    
+    # Log de configuração
+    print(f"🔧 Ambiente: {os.environ.get('FLASK_ENV', 'development')}")
+    print(f"📁 Upload local: {app.config['UPLOAD_FOLDER']}")
+    print(f"☁️ Cloudflare R2: {'HABILITADO' if app.config['R2_ENABLED'] else 'DESABILITADO'}")
     
     app.run(host='0.0.0.0', port=port, debug=debug_mode)
