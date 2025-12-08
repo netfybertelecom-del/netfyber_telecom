@@ -24,16 +24,11 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Configuração do banco de dados - CORREÇÃO CRÍTICA PARA RENDER
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///netfyber.db')
-
-# IMPORTANTE: Converter postgres:// para postgresql+psycopg:// para compatibilidade com Python 3.13
 if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
-elif DATABASE_URL.startswith("postgresql://"):
-    # Se já estiver em formato postgresql, adicionar o driver psycopg
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # Forçar SSL no PostgreSQL (necessário para Render)
-if DATABASE_URL.startswith("postgresql+psycopg://") and os.environ.get('FLASK_ENV') == 'production':
+if DATABASE_URL.startswith("postgresql://") and os.environ.get('FLASK_ENV') == 'production':
     if '?' in DATABASE_URL:
         DATABASE_URL += '&sslmode=require'
     else:

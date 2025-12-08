@@ -8,20 +8,6 @@ services:
     startCommand: "gunicorn app:app"
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0  # Mantenha 3.11.0 que é mais estável
+        value: 3.11.0  # FORÇA Python 3.11
       - key: FLASK_ENV
         value: production
-      # O Render vai gerar automaticamente:
-      # - SECRET_KEY (gerada automaticamente)
-      # - DATABASE_URL (da base de dados PostgreSQL do Render)
-      # Você configura manualmente no painel do Render:
-      # - ADMIN_USERNAME (configurado manualmente)
-      # - ADMIN_PASSWORD (configurado manualmente)
-      # - ADMIN_EMAIL (configurado manualmente)
-      # - ADMIN_URL_PREFIX (configurado manualmente)
-      # - R2_ENABLED (configurado manualmente)
-      # - R2_ENDPOINT_URL (configurado manualmente)
-      # - R2_PUBLIC_URL (configurado manualmente)
-      # - R2_ACCESS_KEY_ID (configurado manualmente)
-      # - R2_SECRET_ACCESS_KEY (configurado manualmente)
-      # - R2_BUCKET (configurado manualmente)
