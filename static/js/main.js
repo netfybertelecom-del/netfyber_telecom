@@ -171,6 +171,185 @@ class CookieManager {
 }
 
 // ========================================
+// CARROSSEL DE PLANOS - CLASSE FUNCIONAL
+// ========================================
+
+class CarrosselPlanos {
+    constructor() {
+        this.carrossel = document.querySelector('.carrossel-planos');
+        this.container = document.querySelector('.carrossel-planos-container');
+        this.items = document.querySelectorAll('.carrossel-item');
+        this.btnPrev = document.querySelector('.carrossel-anterior');
+        this.btnNext = document.querySelector('.carrossel-proximo');
+        this.indicatorsContainer = document.querySelector('.carrossel-indicadores');
+        
+        if (!this.carrossel || !this.items.length) return;
+        
+        this.currentIndex = 0;
+        this.itemsPerView = this.calculateItemsPerView();
+        this.totalSlides = Math.ceil(this.items.length / this.itemsPerView);
+        
+        this.init();
+    }
+
+    calculateItemsPerView() {
+        const width = window.innerWidth;
+        if (width >= 992) return 4; // Desktop grande
+        if (width >= 768) return 2; // Tablet
+        return 1; // Mobile
+    }
+
+    init() {
+        this.createIndicators();
+        this.updateCarrossel();
+        this.setupEventListeners();
+        this.setupResizeListener();
+    }
+
+    createIndicators() {
+        if (!this.indicatorsContainer) return;
+        
+        this.indicatorsContainer.innerHTML = '';
+        
+        for (let i = 0; i < this.totalSlides; i++) {
+            const button = document.createElement('button');
+            button.className = 'carrossel-indicador';
+            button.setAttribute('aria-label', `Ir para slide ${i + 1}`);
+            button.addEventListener('click', () => this.goToSlide(i));
+            this.indicatorsContainer.appendChild(button);
+        }
+        
+        this.updateIndicators();
+    }
+
+    updateIndicators() {
+        const indicators = this.indicatorsContainer.querySelectorAll('.carrossel-indicador');
+        const activeSlide = Math.floor(this.currentIndex / this.itemsPerView);
+        
+        indicators.forEach((indicator, index) => {
+            if (index === activeSlide) {
+                indicator.classList.add('ativo');
+            } else {
+                indicator.classList.remove('ativo');
+            }
+        });
+    }
+
+    updateCarrossel() {
+        const translateX = -this.currentIndex * (100 / this.itemsPerView);
+        this.carrossel.style.transform = `translateX(${translateX}%)`;
+        
+        this.updateIndicators();
+        this.updateButtons();
+    }
+
+    updateButtons() {
+        const isFirstSlide = this.currentIndex === 0;
+        const isLastSlide = this.currentIndex >= this.items.length - this.itemsPerView;
+        
+        if (this.btnPrev) {
+            this.btnPrev.disabled = isFirstSlide;
+            this.btnPrev.setAttribute('aria-disabled', isFirstSlide);
+        }
+        
+        if (this.btnNext) {
+            this.btnNext.disabled = isLastSlide;
+            this.btnNext.setAttribute('aria-disabled', isLastSlide);
+        }
+    }
+
+    next() {
+        const maxIndex = this.items.length - this.itemsPerView;
+        if (this.currentIndex < maxIndex) {
+            this.currentIndex += this.itemsPerView;
+            this.updateCarrossel();
+        }
+    }
+
+    prev() {
+        if (this.currentIndex > 0) {
+            this.currentIndex -= this.itemsPerView;
+            this.updateCarrossel();
+        }
+    }
+
+    goToSlide(slideIndex) {
+        const maxSlide = Math.floor((this.items.length - this.itemsPerView) / this.itemsPerView);
+        const targetIndex = Math.min(Math.max(slideIndex, 0), maxSlide) * this.itemsPerView;
+        
+        if (targetIndex !== this.currentIndex) {
+            this.currentIndex = targetIndex;
+            this.updateCarrossel();
+        }
+    }
+
+    setupEventListeners() {
+        if (this.btnPrev) {
+            this.btnPrev.addEventListener('click', () => this.prev());
+        }
+        
+        if (this.btnNext) {
+            this.btnNext.addEventListener('click', () => this.next());
+        }
+        
+        // Suporte a touch/swipe
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        this.carrossel.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+        
+        this.carrossel.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            this.handleSwipe();
+        }, { passive: true });
+        
+        this.carrossel.addEventListener('mousedown', (e) => {
+            touchStartX = e.screenX;
+        });
+        
+        this.carrossel.addEventListener('mouseup', (e) => {
+            touchEndX = e.screenX;
+            this.handleSwipe();
+        });
+    }
+
+    handleSwipe() {
+        const swipeThreshold = 50;
+        const diff = touchStartX - touchEndX;
+        
+        if (Math.abs(diff) > swipeThreshold) {
+            if (diff > 0) {
+                this.next();
+            } else {
+                this.prev();
+            }
+        }
+    }
+
+    setupResizeListener() {
+        let resizeTimeout;
+        
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            
+            resizeTimeout = setTimeout(() => {
+                const newItemsPerView = this.calculateItemsPerView();
+                
+                if (newItemsPerView !== this.itemsPerView) {
+                    this.itemsPerView = newItemsPerView;
+                    this.totalSlides = Math.ceil(this.items.length / this.itemsPerView);
+                    this.createIndicators();
+                    this.currentIndex = Math.min(this.currentIndex, this.items.length - this.itemsPerView);
+                    this.updateCarrossel();
+                }
+            }, 250);
+        });
+    }
+}
+
+// ========================================
 // INICIALIZAÇÃO CORRIGIDA
 // ========================================
 
@@ -190,12 +369,7 @@ function initEssentialSystems() {
     // Inicializar Cookie Manager
     window.cookieManager = new CookieManager();
     
-    // Inicializar Geolocation Manager se existir
-    if (typeof GeolocationManager !== 'undefined') {
-        window.geolocationManager = new GeolocationManager();
-    }
-    
-    // Inicializar componentes
+    // Inicializar componentes básicos
     initSmoothScroll();
     initBootstrapTooltips();
     initScrollAnimations();
@@ -213,6 +387,18 @@ function initPageSpecificComponents() {
     // Inicializar filtros do blog se estiver na página do blog
     if (path.includes('/blog')) {
         initBlogFilters();
+    }
+}
+
+function initPlanosCarousel() {
+    const carrosselContainer = document.querySelector('.carrossel-planos-container');
+    if (!carrosselContainer) return;
+    
+    try {
+        window.planosCarousel = new CarrosselPlanos();
+        console.log('✅ Carrossel de planos inicializado');
+    } catch (error) {
+        console.error('❌ Erro ao inicializar carrossel:', error);
     }
 }
 
@@ -306,22 +492,6 @@ function validateForm(form) {
 }
 
 // ========================================
-// CARROSSEL DE PLANOS
-// ========================================
-
-function initPlanosCarousel() {
-    const carrosselContainer = document.querySelector('.carrossel-planos-container');
-    if (!carrosselContainer) return;
-    
-    try {
-        window.planosCarousel = new CarrosselPlanos();
-        console.log('✅ Carrossel de planos inicializado');
-    } catch (error) {
-        console.error('❌ Erro ao inicializar carrossel:', error);
-    }
-}
-
-// ========================================
 // FILTROS DO BLOG
 // ========================================
 
@@ -389,11 +559,45 @@ function initBlogFilters() {
 }
 
 // ========================================
+// FUNÇÕES GLOBAIS PARA COOKIES
+// ========================================
+
+function aceitarTodosCookies() {
+    if (window.cookieManager) {
+        window.cookieManager.acceptAll();
+    }
+}
+
+function configurarCookies() {
+    const modal = new bootstrap.Modal(document.getElementById('cookieSettingsModal'));
+    modal.show();
+}
+
+function salvarPreferenciasCookies() {
+    const analytics = document.getElementById('cookieAnalytics')?.checked || false;
+    const personalization = document.getElementById('cookiePersonalization')?.checked || false;
+    
+    if (window.cookieManager) {
+        window.cookieManager.customPreferences(analytics, personalization);
+    }
+    
+    const modal = bootstrap.Modal.getInstance(document.getElementById('cookieSettingsModal'));
+    if (modal) {
+        modal.hide();
+    }
+}
+
+function aceitarCookies() {
+    aceitarTodosCookies();
+}
+
+// ========================================
 // EXPORTAR FUNÇÕES GLOBAIS
 // ========================================
 
 window.NetFyberUtils = {
     CookieManager,
+    CarrosselPlanos,
     initBlogFilters,
     initPlanosCarousel
 };
