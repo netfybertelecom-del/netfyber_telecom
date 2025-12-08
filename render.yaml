@@ -7,30 +7,21 @@ services:
     buildCommand: "./build.sh"
     startCommand: "gunicorn app:app"
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0  # Mantenha 3.11.0 que é mais estável
       - key: FLASK_ENV
         value: production
-      - key: PYTHON_VERSION
-        value: 3.11.0
-      - key: SECRET_KEY
-        generateValue: true
-      - key: ADMIN_USERNAME
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
-      - key: ADMIN_EMAIL
-        value: admin@netfyber.com
-      - key: ADMIN_URL_PREFIX
-        value: /gestao-exclusiva-netfyber
-      # Cloudflare R2 - PRODUÇÃO
-      - key: R2_ENABLED
-        value: true
-      - key: R2_ENDPOINT_URL
-        value: https://3825287deb577b1c158b966f5c441e57.r2.cloudflarestorage.com
-      - key: R2_PUBLIC_URL
-        value: https://pub-3825287deb577b1c158b966f5c441e57.r2.dev
-      - key: R2_ACCESS_KEY_ID
-        sync: false
-      - key: R2_SECRET_ACCESS_KEY
-        sync: false
-      - key: R2_BUCKET
-        value: netfyber-files
+      # O Render vai gerar automaticamente:
+      # - SECRET_KEY (gerada automaticamente)
+      # - DATABASE_URL (da base de dados PostgreSQL do Render)
+      # Você configura manualmente no painel do Render:
+      # - ADMIN_USERNAME (configurado manualmente)
+      # - ADMIN_PASSWORD (configurado manualmente)
+      # - ADMIN_EMAIL (configurado manualmente)
+      # - ADMIN_URL_PREFIX (configurado manualmente)
+      # - R2_ENABLED (configurado manualmente)
+      # - R2_ENDPOINT_URL (configurado manualmente)
+      # - R2_PUBLIC_URL (configurado manualmente)
+      # - R2_ACCESS_KEY_ID (configurado manualmente)
+      # - R2_SECRET_ACCESS_KEY (configurado manualmente)
+      # - R2_BUCKET (configurado manualmente)

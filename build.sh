@@ -10,4 +10,4 @@ pip install -r requirements.txt
 mkdir -p static/uploads/blog
 mkdir -p static/images/blog
 
-echo "✅ Build concluído!"
+echo "✅ Build concluído com sucesso!"

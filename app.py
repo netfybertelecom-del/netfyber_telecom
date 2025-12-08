@@ -22,13 +22,18 @@ app = Flask(__name__)
 # Configurações de variáveis de ambiente
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
-# Configuração do banco de dados
+# Configuração do banco de dados - CORREÇÃO CRÍTICA PARA RENDER
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///netfyber.db')
+
+# IMPORTANTE: Converter postgres:// para postgresql+psycopg:// para compatibilidade com Python 3.13
 if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+elif DATABASE_URL.startswith("postgresql://"):
+    # Se já estiver em formato postgresql, adicionar o driver psycopg
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 
 # Forçar SSL no PostgreSQL (necessário para Render)
-if DATABASE_URL.startswith("postgresql://") and os.environ.get('FLASK_ENV') == 'production':
+if DATABASE_URL.startswith("postgresql+psycopg://") and os.environ.get('FLASK_ENV') == 'production':
     if '?' in DATABASE_URL:
         DATABASE_URL += '&sslmode=require'
     else:
@@ -39,6 +44,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_recycle': 300,
     'pool_pre_ping': True,
+    'connect_args': {
+        'connect_timeout': 10,
+        'application_name': 'netfyber-telecom'
+    }
 }
 
 # Configurações de segurança
@@ -675,7 +684,7 @@ def editar_post(post_id):
             
             # Validar data
             try:
-                data_publicacao = datetime.strptime(request.form['data_publicacao'], '%d/%m/%Y')
+                data_publicacao = datetime.strptime(request.form['data_publicacao'], '%d/%m/Y')
             except ValueError:
                 flash('Formato de data inválido. Use DD/MM/AAAA.', 'error')
                 return redirect(request.url)
@@ -903,5 +912,6 @@ if __name__ == '__main__':
     print(f"🔧 Ambiente: {os.environ.get('FLASK_ENV', 'development')}")
     print(f"📁 Upload local: {app.config['UPLOAD_FOLDER']}")
     print(f"☁️ Cloudflare R2: {'HABILITADO' if app.config['R2_ENABLED'] else 'DESABILITADO'}")
+    print(f"📊 Database URL: {DATABASE_URL[:50]}...")  # Log parcial por segurança
     
     app.run(host='0.0.0.0', port=port, debug=debug_mode)
