@@ -5,9 +5,20 @@ services:
     region: ohio
     plan: free
     buildCommand: "./build.sh"
-    startCommand: "gunicorn app:app"
+    startCommand: "./start.sh"
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0  # FORÇA Python 3.11
+        value: 3.11.0
       - key: FLASK_ENV
         value: production
+      - key: SECRET_KEY
+        sync: false
+      - key: ADMIN_URL_PREFIX
+        value: /gestao-exclusiva-netfyber
+      # Cloudflare R2 (descomente e configure)
+      # - key: R2_ENABLED
+      #   value: "true"
+      # - key: R2_ACCESS_KEY_ID
+      #   sync: false
+      # - key: R2_SECRET_ACCESS_KEY
+      #   sync: false
