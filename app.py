@@ -19,7 +19,7 @@ app = Flask(__name__)
 # Configurações de variáveis de ambiente
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
-# Configuração do banco de dados - CORREÇÃO PARA RENDER
+# Configuração do banco de dados - CORREÇÃO CRÍTICA PARA RENDER
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///netfyber.db')
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -482,12 +482,77 @@ def sync_admin_from_env():
         print(f"❌ Erro ao sincronizar admin: {e}")
 
 # ========================================
+# INICIALIZAÇÃO DO BANCO DE DADOS
+# ========================================
+
+_db_initialized = False
+
+def init_database():
+    """Inicializa o banco de dados e configurações padrão"""
+    global _db_initialized
+    
+    if _db_initialized:
+        return
+    
+    try:
+        print("🔄 Tentando criar tabelas...")
+        db.create_all()
+        
+        # Sincronizar admin do ambiente
+        sync_admin_from_env()
+        
+        # Verificar se há configurações
+        if Configuracao.query.count() == 0:
+            print("⚙️ Criando configurações padrão...")
+            configs_padrao = {
+                'telefone_contato': '(63) 8494-1778',
+                'email_contato': 'contato@netfyber.com',
+                'endereco': 'AV. Tocantins – 934, Centro – Sítio Novo – TO<br>Axixá TO / Juverlândia / São Pedro / Folha Seca / Morada Nova / Santa Luzia / Boa Esperança',
+                'horario_segunda_sexta': '08h às 18h',
+                'horario_sabado': '08h às 13h',
+                'whatsapp_numero': '556384941778',
+                'instagram_url': 'https://www.instagram.com/netfybertelecom',
+                'hero_imagem': 'images/familia.png',
+                'hero_titulo': 'Internet de Alta Velocidade',
+                'hero_subtitulo': 'Conecte sua família ao futuro com a NetFyber Telecom'
+            }
+            
+            for chave, valor in configs_padrao.items():
+                config = Configuracao(chave=chave, valor=valor)
+                db.session.add(config)
+            
+            db.session.commit()
+        
+        _db_initialized = True
+        print("✅ Banco de dados inicializado!")
+        
+    except Exception as e:
+        print(f"❌ Erro ao inicializar banco: {e}")
+        import traceback
+        traceback.print_exc()
+        db.session.rollback()
+        # Não levantamos a exceção para evitar que a aplicação quebre completamente
+
+@app.before_request
+def before_request():
+    """Inicializa o banco de dados antes da primeira requisição"""
+    try:
+        init_database()
+    except Exception as e:
+        print(f"⚠️ Aviso: Não foi possível inicializar o banco de dados: {e}")
+        # Podemos continuar a execução mesmo sem o banco de dados para páginas que não dependem dele
+
+# ========================================
 # ROTAS PÚBLICAS
 # ========================================
 
 @app.route('/')
 def index():
-    return render_template('public/index.html', configs=get_configs())
+    try:
+        configs = get_configs()
+    except Exception:
+        configs = {}
+    return render_template('public/index.html', configs=configs)
 
 @app.route('/planos')
 def planos():
@@ -505,7 +570,13 @@ def planos():
             'features': [bleach.clean(f) for f in plano.get_features_list()],
             'recomendado': plano.recomendado
         })
-    return render_template('public/planos.html', planos=planos_formatados, configs=get_configs())
+    
+    try:
+        configs = get_configs()
+    except Exception:
+        configs = {}
+        
+    return render_template('public/planos.html', planos=planos_formatados, configs=configs)
 
 @app.route('/blog')
 def blog():
@@ -515,15 +586,28 @@ def blog():
         print(f"Erro ao carregar posts: {e}")
         posts = []
     
-    return render_template('public/blog.html', configs=get_configs(), posts=posts)
+    try:
+        configs = get_configs()
+    except Exception:
+        configs = {}
+    
+    return render_template('public/blog.html', configs=configs, posts=posts)
 
 @app.route('/velocimetro')
 def velocimetro():
-    return render_template('public/velocimetro.html', configs=get_configs())
+    try:
+        configs = get_configs()
+    except Exception:
+        configs = {}
+    return render_template('public/velocimetro.html', configs=configs)
 
 @app.route('/sobre')
 def sobre():
-    return render_template('public/sobre.html', configs=get_configs())
+    try:
+        configs = get_configs()
+    except Exception:
+        configs = {}
+    return render_template('public/sobre.html', configs=configs)
 
 # ========================================
 # AUTENTICAÇÃO ADMIN
@@ -531,6 +615,12 @@ def sobre():
 
 @app.route(f'{ADMIN_URL_PREFIX}/login', methods=['GET', 'POST'])
 def admin_login():
+    # Se o banco de dados não estiver inicializado, tenta inicializar
+    try:
+        init_database()
+    except Exception as e:
+        print(f"⚠️ Aviso: Não foi possível inicializar o banco de dados: {e}")
+    
     if current_user.is_authenticated:
         return redirect(url_for('admin_planos'))
     
@@ -542,22 +632,25 @@ def admin_login():
             flash('Credenciais inválidas.', 'error')
             return render_template('auth/login.html')
         
-        user = AdminUser.query.filter_by(username=username, is_active=True).first()
-        
-        if user:
-            try:
-                if user.check_password(password):
-                    login_user(user, remember=False)
-                    user.last_login = datetime.utcnow()
-                    db.session.commit()
-                    flash('Login realizado com sucesso!', 'success')
-                    return redirect(url_for('admin_planos'))
-                else:
-                    flash('Usuário ou senha inválidos.', 'error')
-            except Exception as e:
-                flash(f'Erro ao fazer login: {str(e)}', 'error')
-        else:
-            flash('Usuário ou senha inválidos.', 'error')
+        try:
+            user = AdminUser.query.filter_by(username=username, is_active=True).first()
+            
+            if user:
+                try:
+                    if user.check_password(password):
+                        login_user(user, remember=False)
+                        user.last_login = datetime.utcnow()
+                        db.session.commit()
+                        flash('Login realizado com sucesso!', 'success')
+                        return redirect(url_for('admin_planos'))
+                    else:
+                        flash('Usuário ou senha inválidos.', 'error')
+                except Exception as e:
+                    flash(f'Erro ao fazer login: {str(e)}', 'error')
+            else:
+                flash('Usuário ou senha inválidos.', 'error')
+        except Exception as e:
+            flash(f'Erro ao acessar o banco de dados: {str(e)}', 'error')
     
     return render_template('auth/login.html')
 
@@ -580,6 +673,7 @@ def admin_blog():
     except Exception as e:
         print(f"Erro ao carregar posts: {e}")
         posts = []
+        flash('Erro ao carregar posts do blog.', 'error')
     
     return render_template('admin/blog.html', posts=posts)
 
@@ -648,7 +742,11 @@ def adicionar_post():
 @app.route(f'{ADMIN_URL_PREFIX}/blog/<int:post_id>/editar', methods=['GET', 'POST'])
 @login_required
 def editar_post(post_id):
-    post = Post.query.get_or_404(post_id)
+    try:
+        post = Post.query.get_or_404(post_id)
+    except Exception as e:
+        flash(f'Erro ao carregar post: {str(e)}', 'error')
+        return redirect(url_for('admin_blog'))
     
     if request.method == 'POST':
         try:
@@ -731,6 +829,7 @@ def admin_planos():
     except Exception as e:
         print(f"Erro ao carregar planos: {e}")
         planos_data = []
+        flash('Erro ao carregar planos.', 'error')
     
     return render_template('admin/planos.html', planos=planos_data)
 
@@ -759,7 +858,11 @@ def adicionar_plano():
 @app.route(f'{ADMIN_URL_PREFIX}/planos/<int:plano_id>/editar', methods=['GET', 'POST'])
 @login_required
 def editar_plano(plano_id):
-    plano = Plano.query.get_or_404(plano_id)
+    try:
+        plano = Plano.query.get_or_404(plano_id)
+    except Exception as e:
+        flash(f'Erro ao carregar plano: {str(e)}', 'error')
+        return redirect(url_for('admin_planos'))
     
     if request.method == 'POST':
         try:
@@ -811,7 +914,12 @@ def admin_configuracoes():
             db.session.rollback()
             flash(f'Erro ao atualizar configurações: {str(e)}', 'error')
     
-    configs = get_configs()
+    try:
+        configs = get_configs()
+    except Exception:
+        configs = {}
+        flash('Erro ao carregar configurações.', 'error')
+    
     return render_template('admin/configuracoes.html', configs=configs)
 
 # ========================================
@@ -824,73 +932,27 @@ def health_check():
 
 @app.errorhandler(404)
 def pagina_nao_encontrada(error):
-    return render_template('public/404.html', configs=get_configs()), 404
+    try:
+        configs = get_configs()
+    except Exception:
+        configs = {}
+    return render_template('public/404.html', configs=configs), 404
 
 @app.errorhandler(403)
 def acesso_negado(error):
-    return render_template('public/403.html', configs=get_configs()), 403
+    try:
+        configs = get_configs()
+    except Exception:
+        configs = {}
+    return render_template('public/403.html', configs=configs), 403
 
 @app.errorhandler(500)
 def erro_servidor(error):
-    return render_template('public/500.html', configs=get_configs()), 500
-
-# ========================================
-# INICIALIZAÇÃO DO BANCO DE DADOS
-# ========================================
-
-def init_database():
-    """Inicializa o banco de dados e configurações padrão"""
     try:
-        print("🔄 Criando tabelas...")
-        db.create_all()
-        
-        # Sincronizar admin do ambiente
-        sync_admin_from_env()
-        
-        # Verificar se há configurações
-        if Configuracao.query.count() == 0:
-            print("⚙️ Criando configurações padrão...")
-            configs_padrao = {
-                'telefone_contato': '(63) 8494-1778',
-                'email_contato': 'contato@netfyber.com',
-                'endereco': 'AV. Tocantins – 934, Centro – Sítio Novo – TO<br>Axixá TO / Juverlândia / São Pedro / Folha Seca / Morada Nova / Santa Luzia / Boa Esperança',
-                'horario_segunda_sexta': '08h às 18h',
-                'horario_sabado': '08h às 13h',
-                'whatsapp_numero': '556384941778',
-                'instagram_url': 'https://www.instagram.com/netfybertelecom',
-                'hero_imagem': 'images/familia.png',
-                'hero_titulo': 'Internet de Alta Velocidade',
-                'hero_subtitulo': 'Conecte sua família ao futuro com a NetFyber Telecom'
-            }
-            
-            for chave, valor in configs_padrao.items():
-                config = Configuracao(chave=chave, valor=valor)
-                db.session.add(config)
-            
-            db.session.commit()
-        
-        print("✅ Banco de dados inicializado!")
-        
-    except Exception as e:
-        print(f"❌ Erro ao inicializar banco: {e}")
-        import traceback
-        traceback.print_exc()
-        db.session.rollback()
-
-# ========================================
-# INICIALIZAÇÃO DA APLICAÇÃO
-# ========================================
-
-_db_initialized = False
-
-@app.before_request
-def initialize_database():
-    """Inicializa o banco de dados na primeira requisição"""
-    global _db_initialized
-    if not _db_initialized:
-        with app.app_context():
-            init_database()
-        _db_initialized = True
+        configs = get_configs()
+    except Exception:
+        configs = {}
+    return render_template('public/500.html', configs=configs), 500
 
 # ========================================
 # PONTO DE ENTRADA PRINCIPAL
