@@ -9,9 +9,6 @@ import bleach
 import re
 from urllib.parse import urlparse
 import secrets
-import boto3
-from botocore.exceptions import ClientError
-from functools import lru_cache
 
 # ========================================
 # CONFIGURAÇÃO DA APLICAÇÃO
@@ -22,13 +19,13 @@ app = Flask(__name__)
 # Configurações de variáveis de ambiente
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
-# Configuração do banco de dados - CORREÇÃO CRÍTICA PARA RENDER
+# Configuração do banco de dados - CORREÇÃO PARA RENDER
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///netfyber.db')
-if DATABASE_URL.startswith("postgres://"):
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # Forçar SSL no PostgreSQL (necessário para Render)
-if DATABASE_URL.startswith("postgresql://") and os.environ.get('FLASK_ENV') == 'production':
+if DATABASE_URL and DATABASE_URL.startswith("postgresql://") and os.environ.get('FLASK_ENV') == 'production':
     if '?' in DATABASE_URL:
         DATABASE_URL += '&sslmode=require'
     else:
@@ -90,28 +87,6 @@ def secure_headers(response):
 # FUNÇÕES DE ARMAZENAMENTO DUAL (LOCAL + R2)
 # ========================================
 
-@lru_cache(maxsize=1)
-def get_r2_client():
-    """Retorna cliente S3 configurado para Cloudflare R2 (produção)"""
-    if not current_app.config.get('R2_ENABLED'):
-        return None
-    
-    try:
-        client = boto3.client(
-            's3',
-            endpoint_url=current_app.config.get('R2_ENDPOINT_URL'),
-            aws_access_key_id=current_app.config.get('R2_ACCESS_KEY_ID'),
-            aws_secret_access_key=current_app.config.get('R2_SECRET_ACCESS_KEY'),
-            region_name='auto'
-        )
-        # Testa a conexão
-        client.list_buckets()
-        print("✅ Cloudflare R2 conectado com sucesso!")
-        return client
-    except Exception as e:
-        print(f"⚠️ Cloudflare R2 não disponível: {e}")
-        return None
-
 def allowed_file(filename):
     """Verifica se o arquivo tem uma extensão permitida"""
     if not filename or '.' not in filename:
@@ -153,12 +128,19 @@ def save_image_r2(file):
     if not allowed_file(file.filename):
         return None
     
-    client = get_r2_client()
-    if not client:
-        print("⚠️ Cliente R2 não disponível, usando fallback local")
-        return save_image_local(file)
-    
     try:
+        import boto3
+        from botocore.exceptions import ClientError
+        
+        # Configurar cliente S3 para Cloudflare R2
+        s3_client = boto3.client(
+            's3',
+            endpoint_url=current_app.config.get('R2_ENDPOINT_URL'),
+            aws_access_key_id=current_app.config.get('R2_ACCESS_KEY_ID'),
+            aws_secret_access_key=current_app.config.get('R2_SECRET_ACCESS_KEY'),
+            region_name='auto'
+        )
+        
         ext = file.filename.rsplit('.', 1)[1].lower()
         filename = f"{uuid.uuid4().hex}.{ext}"
         bucket_name = current_app.config.get('R2_BUCKET')
@@ -168,12 +150,11 @@ def save_image_r2(file):
         if ext == 'jpg':
             content_type = 'image/jpeg'
         
-        client.upload_fileobj(
+        s3_client.upload_fileobj(
             file,
             bucket_name,
             filename,
             ExtraArgs={
-                'ACL': 'public-read',
                 'ContentType': content_type
             }
         )
@@ -183,8 +164,7 @@ def save_image_r2(file):
         
     except Exception as e:
         print(f"❌ Erro ao enviar para R2: {e}")
-        print("⚠️ Usando fallback local")
-        return save_image_local(file)
+        return None
 
 def save_blog_image(file):
     """Salva imagem do blog usando método apropriado"""
@@ -192,9 +172,12 @@ def save_blog_image(file):
         return None
     
     if current_app.config.get('R2_ENABLED'):
-        return save_image_r2(file)
-    else:
-        return save_image_local(file)
+        result = save_image_r2(file)
+        if result:
+            return result
+    
+    # Fallback para armazenamento local
+    return save_image_local(file)
 
 def delete_image_local(filename):
     """Exclui imagem localmente"""
@@ -219,15 +202,22 @@ def delete_image_r2(filename):
     if not filename or filename == 'default.jpg':
         return False
     
-    client = get_r2_client()
-    if not client:
-        return delete_image_local(filename)
-    
     try:
+        import boto3
+        
+        s3_client = boto3.client(
+            's3',
+            endpoint_url=current_app.config.get('R2_ENDPOINT_URL'),
+            aws_access_key_id=current_app.config.get('R2_ACCESS_KEY_ID'),
+            aws_secret_access_key=current_app.config.get('R2_SECRET_ACCESS_KEY'),
+            region_name='auto'
+        )
+        
         bucket_name = current_app.config.get('R2_BUCKET')
-        client.delete_object(Bucket=bucket_name, Key=filename)
+        s3_client.delete_object(Bucket=bucket_name, Key=filename)
         print(f"✅ Imagem excluída do R2: {filename}")
         return True
+        
     except Exception as e:
         print(f"❌ Erro ao excluir do R2: {e}")
         return False
@@ -253,6 +243,7 @@ def get_image_url(filename):
         bucket_name = current_app.config.get('R2_BUCKET')
         
         if public_url_base:
+            # Formato Cloudflare R2: https://pub-<account-id>.r2.dev/<bucket-name>/<filename>
             return f"{public_url_base}/{bucket_name}/{filename}"
     
     # Fallback para URL local
@@ -379,8 +370,6 @@ class AdminUser(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(512), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
-    login_attempts = db.Column(db.Integer, default=0)
-    locked_until = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
 
@@ -390,22 +379,7 @@ class AdminUser(UserMixin, db.Model):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
-        if self.locked_until and datetime.utcnow() < self.locked_until:
-            raise ValueError("Conta temporariamente bloqueada. Tente novamente mais tarde.")
-        
-        is_correct = check_password_hash(self.password_hash, password)
-        
-        if is_correct:
-            self.login_attempts = 0
-            self.locked_until = None
-            self.last_login = datetime.utcnow()
-        else:
-            self.login_attempts += 1
-            if self.login_attempts >= 5:
-                self.locked_until = datetime.utcnow() + timedelta(minutes=30)
-        
-        db.session.commit()
-        return is_correct
+        return check_password_hash(self.password_hash, password)
 
 class Plano(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -472,7 +446,8 @@ def get_configs():
         for config in configuracoes_db:
             configs[config.chave] = bleach.clean(config.valor)
         return configs
-    except Exception:
+    except Exception as e:
+        print(f"Erro ao carregar configurações: {e}")
         return {}
 
 # ========================================
@@ -481,27 +456,30 @@ def get_configs():
 
 def sync_admin_from_env():
     """Sincroniza usuário admin a partir das variáveis de ambiente"""
-    admin_username = os.environ.get('ADMIN_USERNAME')
-    admin_password = os.environ.get('ADMIN_PASSWORD')
+    admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'Teste123!')
     admin_email = os.environ.get('ADMIN_EMAIL', 'admin@netfyber.com')
     
     if not admin_username or not admin_password:
-        print("⚠️ ADMIN_USERNAME ou ADMIN_PASSWORD não definidos. Pulando criação de admin.")
+        print("⚠️ ADMIN_USERNAME ou ADMIN_PASSWORD não definidos.")
         return
     
-    user = AdminUser.query.filter_by(username=admin_username).first()
-    
-    if user:
-        user.set_password(admin_password)
-        user.email = admin_email
+    try:
+        user = AdminUser.query.filter_by(username=admin_username).first()
+        
+        if user:
+            user.set_password(admin_password)
+            user.email = admin_email
+            print(f"✅ Admin {admin_username} atualizado.")
+        else:
+            new_admin = AdminUser(username=admin_username, email=admin_email)
+            new_admin.set_password(admin_password)
+            db.session.add(new_admin)
+            print(f"✅ Admin {admin_username} criado.")
+        
         db.session.commit()
-        print(f"✅ Admin {admin_username} atualizado.")
-    else:
-        new_admin = AdminUser(username=admin_username, email=admin_email)
-        new_admin.set_password(admin_password)
-        db.session.add(new_admin)
-        db.session.commit()
-        print(f"✅ Admin {admin_username} criado.")
+    except Exception as e:
+        print(f"❌ Erro ao sincronizar admin: {e}")
 
 # ========================================
 # ROTAS PÚBLICAS
@@ -513,7 +491,12 @@ def index():
 
 @app.route('/planos')
 def planos():
-    planos_data = Plano.query.filter_by(ativo=True).order_by(Plano.ordem_exibicao).all()
+    try:
+        planos_data = Plano.query.filter_by(ativo=True).order_by(Plano.ordem_exibicao).all()
+    except Exception as e:
+        print(f"Erro ao carregar planos: {e}")
+        planos_data = []
+    
     planos_formatados = []
     for plano in planos_data:
         planos_formatados.append({
@@ -526,7 +509,12 @@ def planos():
 
 @app.route('/blog')
 def blog():
-    posts = Post.query.filter_by(ativo=True).order_by(Post.data_publicacao.desc()).all()
+    try:
+        posts = Post.query.filter_by(ativo=True).order_by(Post.data_publicacao.desc()).all()
+    except Exception as e:
+        print(f"Erro ao carregar posts: {e}")
+        posts = []
+    
     return render_template('public/blog.html', configs=get_configs(), posts=posts)
 
 @app.route('/velocimetro')
@@ -560,12 +548,14 @@ def admin_login():
             try:
                 if user.check_password(password):
                     login_user(user, remember=False)
+                    user.last_login = datetime.utcnow()
+                    db.session.commit()
                     flash('Login realizado com sucesso!', 'success')
                     return redirect(url_for('admin_planos'))
                 else:
                     flash('Usuário ou senha inválidos.', 'error')
-            except ValueError as e:
-                flash(str(e), 'error')
+            except Exception as e:
+                flash(f'Erro ao fazer login: {str(e)}', 'error')
         else:
             flash('Usuário ou senha inválidos.', 'error')
     
@@ -585,7 +575,12 @@ def admin_logout():
 @app.route(f'{ADMIN_URL_PREFIX}/blog')
 @login_required
 def admin_blog():
-    posts = Post.query.filter_by(ativo=True).order_by(Post.data_publicacao.desc()).all()
+    try:
+        posts = Post.query.filter_by(ativo=True).order_by(Post.data_publicacao.desc()).all()
+    except Exception as e:
+        print(f"Erro ao carregar posts: {e}")
+        posts = []
+    
     return render_template('admin/blog.html', posts=posts)
 
 @app.route(f'{ADMIN_URL_PREFIX}/blog/adicionar', methods=['GET', 'POST'])
@@ -623,16 +618,14 @@ def adicionar_post():
                 flash('Formato de data inválido. Use DD/MM/AAAA.', 'error')
                 return redirect(request.url)
             
-            # Criar resumo usando a formatação inteligente
-            conteudo_html = sanitize_html(request.form['conteudo'])
-            # Remover tags HTML para o resumo
-            conteudo_texto = re.sub(r'<[^>]+>', '', conteudo_html)
+            # Criar resumo
+            conteudo_texto = re.sub(r'<[^>]+>', '', request.form['conteudo'])
             resumo = conteudo_texto[:150] + '...' if len(conteudo_texto) > 150 else conteudo_texto
             
             # Criar post
             novo_post = Post(
                 titulo=bleach.clean(request.form['titulo']),
-                conteudo=request.form['conteudo'],  # Mantém o conteúdo original com markdown
+                conteudo=request.form['conteudo'],
                 resumo=bleach.clean(resumo),
                 categoria=bleach.clean(request.form['categoria']),
                 imagem=imagem_filename,
@@ -679,20 +672,18 @@ def editar_post(post_id):
             
             # Validar data
             try:
-                data_publicacao = datetime.strptime(request.form['data_publicacao'], '%d/%m/Y')
+                data_publicacao = datetime.strptime(request.form['data_publicacao'], '%d/%m/%Y')
             except ValueError:
                 flash('Formato de data inválido. Use DD/MM/AAAA.', 'error')
                 return redirect(request.url)
             
-            # Criar resumo usando a formatação inteligente
-            conteudo_html = sanitize_html(request.form['conteudo'])
-            # Remover tags HTML para o resumo
-            conteudo_texto = re.sub(r'<[^>]+>', '', conteudo_html)
+            # Criar resumo
+            conteudo_texto = re.sub(r'<[^>]+>', '', request.form['conteudo'])
             resumo = conteudo_texto[:150] + '...' if len(conteudo_texto) > 150 else conteudo_texto
             
             # Atualizar post
             post.titulo = bleach.clean(request.form['titulo'])
-            post.conteudo = request.form['conteudo']  # Mantém o conteúdo original com markdown
+            post.conteudo = request.form['conteudo']
             post.resumo = bleach.clean(resumo)
             post.categoria = bleach.clean(request.form['categoria'])
             post.link_materia = link_materia
@@ -735,7 +726,12 @@ def excluir_post(post_id):
 @app.route(f'{ADMIN_URL_PREFIX}/planos')
 @login_required
 def admin_planos():
-    planos_data = Plano.query.filter_by(ativo=True).order_by(Plano.ordem_exibicao).all()
+    try:
+        planos_data = Plano.query.filter_by(ativo=True).order_by(Plano.ordem_exibicao).all()
+    except Exception as e:
+        print(f"Erro ao carregar planos: {e}")
+        planos_data = []
+    
     return render_template('admin/planos.html', planos=planos_data)
 
 @app.route(f'{ADMIN_URL_PREFIX}/planos/adicionar', methods=['GET', 'POST'])
@@ -754,9 +750,9 @@ def adicionar_plano():
             db.session.commit()
             flash(f'Plano "{novo_plano.nome}" adicionado com sucesso!', 'success')
             return redirect(url_for('admin_planos'))
-        except Exception:
+        except Exception as e:
             db.session.rollback()
-            flash('Erro ao adicionar plano.', 'error')
+            flash(f'Erro ao adicionar plano: {str(e)}', 'error')
     
     return render_template('admin/plano_form.html')
 
@@ -776,9 +772,9 @@ def editar_plano(plano_id):
             db.session.commit()
             flash('Plano atualizado com sucesso!', 'success')
             return redirect(url_for('admin_planos'))
-        except Exception:
+        except Exception as e:
             db.session.rollback()
-            flash('Erro ao atualizar plano.', 'error')
+            flash(f'Erro ao atualizar plano: {str(e)}', 'error')
     
     return render_template('admin/plano_form.html', plano=plano)
 
@@ -811,9 +807,9 @@ def admin_configuracoes():
                         db.session.add(config)
             db.session.commit()
             flash('Configurações atualizadas com sucesso!', 'success')
-        except Exception:
+        except Exception as e:
             db.session.rollback()
-            flash('Erro ao atualizar configurações.', 'error')
+            flash(f'Erro ao atualizar configurações: {str(e)}', 'error')
     
     configs = get_configs()
     return render_template('admin/configuracoes.html', configs=configs)
@@ -845,35 +841,40 @@ def erro_servidor(error):
 def init_database():
     """Inicializa o banco de dados e configurações padrão"""
     try:
+        print("🔄 Criando tabelas...")
         db.create_all()
-        print("✅ Tabelas criadas/verificadas com sucesso!")
         
         # Sincronizar admin do ambiente
         sync_admin_from_env()
         
-        # Configurações padrão
-        configs_padrao = {
-            'telefone_contato': '(63) 8494-1778',
-            'email_contato': 'contato@netfyber.com',
-            'endereco': 'AV. Tocantins – 934, Centro – Sítio Novo – TO<br>Axixá TO / Juverlândia / São Pedro / Folha Seca / Morada Nova / Santa Luzia / Boa Esperança',
-            'horario_segunda_sexta': '08h às 18h',
-            'horario_sabado': '08h às 13h',
-            'whatsapp_numero': '556384941778',
-            'instagram_url': 'https://www.instagram.com/netfybertelecom',
-            'hero_imagem': 'images/familia.png',
-            'hero_titulo': 'Internet de Alta Velocidade',
-            'hero_subtitulo': 'Conecte sua família ao futuro com a NetFyber Telecom'
-        }
-        
-        for chave, valor in configs_padrao.items():
-            if Configuracao.query.filter_by(chave=chave).first() is None:
+        # Verificar se há configurações
+        if Configuracao.query.count() == 0:
+            print("⚙️ Criando configurações padrão...")
+            configs_padrao = {
+                'telefone_contato': '(63) 8494-1778',
+                'email_contato': 'contato@netfyber.com',
+                'endereco': 'AV. Tocantins – 934, Centro – Sítio Novo – TO<br>Axixá TO / Juverlândia / São Pedro / Folha Seca / Morada Nova / Santa Luzia / Boa Esperança',
+                'horario_segunda_sexta': '08h às 18h',
+                'horario_sabado': '08h às 13h',
+                'whatsapp_numero': '556384941778',
+                'instagram_url': 'https://www.instagram.com/netfybertelecom',
+                'hero_imagem': 'images/familia.png',
+                'hero_titulo': 'Internet de Alta Velocidade',
+                'hero_subtitulo': 'Conecte sua família ao futuro com a NetFyber Telecom'
+            }
+            
+            for chave, valor in configs_padrao.items():
                 config = Configuracao(chave=chave, valor=valor)
                 db.session.add(config)
+            
+            db.session.commit()
         
-        db.session.commit()
-        print("🎉 Banco de dados inicializado com sucesso!")
+        print("✅ Banco de dados inicializado!")
+        
     except Exception as e:
         print(f"❌ Erro ao inicializar banco: {e}")
+        import traceback
+        traceback.print_exc()
         db.session.rollback()
 
 # ========================================
@@ -907,6 +908,5 @@ if __name__ == '__main__':
     print(f"🔧 Ambiente: {os.environ.get('FLASK_ENV', 'development')}")
     print(f"📁 Upload local: {app.config['UPLOAD_FOLDER']}")
     print(f"☁️ Cloudflare R2: {'HABILITADO' if app.config['R2_ENABLED'] else 'DESABILITADO'}")
-    print(f"📊 Database URL: {DATABASE_URL[:50]}...")  # Log parcial por segurança
     
     app.run(host='0.0.0.0', port=port, debug=debug_mode)
